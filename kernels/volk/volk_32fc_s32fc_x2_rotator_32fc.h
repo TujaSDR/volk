@@ -87,6 +87,82 @@
 #include <math.h>
 #define ROTATOR_RELOAD 512
 
+#ifdef LV_HAVE_NEON
+#include <arm_neon.h>
+#include <volk/volk_neon_intrinsics.h>
+
+static inline void volk_32fc_s32fc_x2_rotator_32fc_neon(lv_32fc_t* outVector, const lv_32fc_t* inVector, const lv_32fc_t phase_inc, lv_32fc_t* phase, unsigned int num_points)
+
+{
+    lv_32fc_t* outputVectorPtr = outVector;
+    const lv_32fc_t* inputVectorPtr = inVector;
+    lv_32fc_t incr = 1;
+    lv_32fc_t phasePtr[4] = {(*phase), (*phase), (*phase), (*phase)};
+    
+    float32x4x2_t input_vec;
+    float32x4x2_t output_vec;
+    float32x4x2_t phase_vec;
+    float32x4x2_t incr_vec;
+    
+    unsigned int i = 0, j = 0;
+    const unsigned int quarter_points = num_points / 4;
+    
+    for(i = 0; i < 4; ++i) {
+        phasePtr[i] *= incr;
+        incr *= (phase_inc);
+    }
+    // Notice that incr has be incremented in the previous loop
+    const lv_32fc_t incrPtr[4] = {incr, incr, incr, incr};
+    
+    phase_vec = vld2q_f32((float32_t*) phasePtr); // 2 is the stride
+    incr_vec = vld2q_f32((float32_t*) incrPtr); // 2 is the stride
+    
+    for(i = 0; i < (unsigned int)(quarter_points/ROTATOR_RELOAD); i++) {
+        for(j = 0; j < ROTATOR_RELOAD; j++) {
+            input_vec = vld2q_f32((float32_t*) inputVectorPtr);
+            // Prefetch next one, speeds things up
+            __VOLK_PREFETCH(inputVectorPtr+4);
+            // Rotate
+            output_vec = _vmultiply_complexq_f32(input_vec, phase_vec);
+            // Increase phase
+            phase_vec = _vmultiply_complexq_f32(phase_vec, incr_vec);
+            // Store output
+            vst2q_f32((float32_t*)outputVectorPtr, output_vec);
+            
+            outputVectorPtr+=4;
+            inputVectorPtr+=4;
+        }
+        // normalize phase so magnitude doesn't grow because of
+        // floating point rounding error
+        float32x4_t mag_squared = _vmagnitudesquaredq_f32(phase_vec);
+        float32x4_t inv_mag = _vinvsqrtq_f32(mag_squared);
+        phase_vec.val[0] = vmulq_f32(phase_vec.val[0], inv_mag);
+        phase_vec.val[1] = vmulq_f32(phase_vec.val[1], inv_mag);
+    }
+    
+    for(i = 0; i < quarter_points % ROTATOR_RELOAD; ++i) {
+        input_vec = vld2q_f32((float32_t*) inputVectorPtr);
+        // Prefetch next one, speeds things up
+        __VOLK_PREFETCH(inputVectorPtr+4);
+        // Rotate
+        output_vec = _vmultiply_complexq_f32(input_vec, phase_vec);
+        // Increase phase
+        phase_vec = _vmultiply_complexq_f32(phase_vec, incr_vec);
+        // Store output
+        vst2q_f32((float32_t*)outputVectorPtr, output_vec);
+        
+        outputVectorPtr+=4;
+        inputVectorPtr+=4;
+    }
+    
+    // Deal with the rest
+    for(i = 0; i < num_points % 4; ++i) {
+        *outputVectorPtr++ = *inputVectorPtr++ * phasePtr[0];
+        phasePtr[0] *= (phase_inc);
+    }
+}
+
+#endif /* LV_HAVE_NEON */
 
 #ifdef LV_HAVE_GENERIC
 

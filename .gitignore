@@ -2,3 +2,7 @@
 *.pyc
 *.pyo
 *build*/
+
+.DS_Store
+._*
+*.old

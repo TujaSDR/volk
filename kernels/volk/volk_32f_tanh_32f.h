@@ -73,6 +73,40 @@
 #include <math.h>
 #include <string.h>
 
+#ifdef LV_HAVE_NEON
+#include <arm_neon.h>
+#include <volk/volk_neon_intrinsics.h>
+
+static inline void
+volk_32f_tanh_32f_neon(float* bVector, const float* aVector, unsigned int num_points)
+{
+    float* outputVectorPtr = bVector;
+    const float* inputVectorPtr = aVector;
+    unsigned int number;
+    unsigned int quarter_points = num_points / 4;
+    float32x4_t input_vec;
+    float32x4_t ouput_vec;
+    
+    for(number = 0; number < quarter_points; number++) {
+        // load f32
+        input_vec = vld1q_f32(inputVectorPtr);
+        // Prefetch next 4
+        __VOLK_PREFETCH(inputVectorPtr+4);
+        ouput_vec = _vtanhq_f32(input_vec);
+        vst1q_f32(outputVectorPtr, ouput_vec);
+        // move pointers ahead
+        outputVectorPtr+=4;
+        inputVectorPtr+=4;
+    }
+    
+    // deal with the rest
+    for(number = quarter_points * 4; number < num_points; number++) {
+        *outputVectorPtr++ = tanhf(*inputVectorPtr++);
+    }
+}
+
+#endif /* LV_HAVE_NEON */
+
 #ifdef LV_HAVE_GENERIC
 
 static inline void

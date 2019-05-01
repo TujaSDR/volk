@@ -78,6 +78,7 @@
 #ifndef INCLUDED_volk_32f_tan_32f_a_H
 #define INCLUDED_volk_32f_tan_32f_a_H
 
+
 #if LV_HAVE_AVX2 && LV_HAVE_FMA
 #include <immintrin.h>
 

@@ -188,7 +188,7 @@ volk_32fc_32f_multiply_32fc_neon(lv_32fc_t* cVector, const lv_32fc_t* aVector,
 {
   lv_32fc_t* cPtr = cVector;
   const lv_32fc_t* aPtr = aVector;
-  const float* bPtr=  bVector;
+  const float* bPtr = bVector;
   unsigned int number = 0;
   unsigned int quarter_points = num_points / 4;
 
@@ -197,6 +197,9 @@ volk_32fc_32f_multiply_32fc_neon(lv_32fc_t* cVector, const lv_32fc_t* aVector,
   for(number = 0; number < quarter_points; number++){
     inputVector = vld2q_f32((float*)aPtr);
     tapsVector = vld1q_f32(bPtr);
+      
+    __VOLK_PREFETCH(aPtr+4);
+    __VOLK_PREFETCH(bPtr+4);
 
     outputVector.val[0] = vmulq_f32(inputVector.val[0], tapsVector);
     outputVector.val[1] = vmulq_f32(inputVector.val[1], tapsVector);
