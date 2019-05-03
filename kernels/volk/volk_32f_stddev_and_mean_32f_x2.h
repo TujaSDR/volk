@@ -76,6 +76,56 @@
 #include <stdio.h>
 #include <math.h>
 
+#ifdef LV_HAVE_NEON
+#include <arm_neon.h>
+#include <volk/volk_neon_intrinsics.h>
+
+static inline void
+volk_32f_stddev_and_mean_32f_x2_neon(float* stddev, float* mean,
+                                     const float* inputBuffer,
+                                     unsigned int num_points)
+{
+    unsigned int number = 0;
+    unsigned int quarter_points = num_points / 4;
+    const float* inputBufferPtr = inputBuffer;
+    float returnValue = 0;
+    float newMean = 0;
+    
+    float32x4_t input_vec;
+    float32x4_t result_vec = vdupq_n_f32(0.f);
+    float32x4_t mean_vec = vdupq_n_f32(0.f);
+    
+    // Quarter points
+    for(number = 0; number < quarter_points; number++) {
+        input_vec = vld1q_f32(inputBufferPtr);
+        // Prefetch next one, speeds things up
+        __VOLK_PREFETCH(inputBufferPtr+4);
+        mean_vec = vaddq_f32(mean_vec, input_vec);
+        result_vec = vmlaq_f32(result_vec, input_vec, input_vec);
+        // Move pointer ahead
+        inputBufferPtr+=4;
+    }
+    // Sum lanes
+    newMean = _vsumq_f32(mean_vec);
+    returnValue = _vsumq_f32(result_vec);
+    
+    // Deal with the rest
+    for(number = quarter_points * 4; number < num_points; number++) {
+        newMean += (*inputBufferPtr);
+        returnValue += (*inputBufferPtr) * (*inputBufferPtr);
+        inputBufferPtr++;
+    }
+    
+    newMean /= num_points;
+    returnValue /= num_points;
+    returnValue -= (newMean * newMean);
+    returnValue = sqrtf(returnValue);
+    
+    *stddev = returnValue;
+    *mean = newMean;
+}
+#endif /* LV_HAVE_NEON */
+
 #ifdef LV_HAVE_AVX
 #include <immintrin.h>
 

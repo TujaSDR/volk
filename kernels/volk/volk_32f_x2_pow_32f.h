@@ -78,47 +78,6 @@
 
 #define POW_POLY_DEGREE 3
 
-#ifdef LV_HAVE_NEON
-#include <arm_neon.h>
-#include <volk/volk_neon_intrinsics.h>
-
-static inline void
-volk_32f_x2_pow_32f_neon(float* cVector, const float* bVector,
-                            const float* aVector, unsigned int num_points)
-{
-    float* cPtr = cVector;
-    const float* aPtr = aVector;
-    const float* bPtr = bVector;
-    unsigned int number;
-    unsigned int quarter_points = num_points / 4;
-    float32x4_t c_vec;
-    float32x4_t a_vec;
-    float32x4_t b_vec;
-    
-    for(number = 0; number < quarter_points; number++) {
-        // load f32
-        a_vec = vld1q_f32(aPtr);
-        b_vec = vld1q_f32(bPtr);
-        // Prefetch next 4
-        __VOLK_PREFETCH(aPtr+4);
-        __VOLK_PREFETCH(bPtr+4);
-        c_vec = _vpowq_f32(a_vec, b_vec);
-        vst1q_f32(cPtr, c_vec);
-        // move pointers ahead
-        cPtr+=4;
-        aPtr+=4;
-        bPtr+=4;
-    }
-    
-    // deal with the rest
-    for(number = quarter_points * 4; number < num_points; number++) {
-        *cPtr++ = powf(*aPtr++, *bPtr++);
-    }
-}
-
-#endif /* LV_HAVE_NEON */
-
-
 #if LV_HAVE_AVX2 && LV_HAVE_FMA
 #include <immintrin.h>
 
@@ -486,6 +445,46 @@ volk_32f_x2_pow_32f_a_sse4_1(float* cVector, const float* bVector,
 
 #define POW_POLY_DEGREE 3
 
+#ifdef LV_HAVE_NEON
+#include <arm_neon.h>
+#include <volk/volk_neon_intrinsics.h>
+
+static inline void
+volk_32f_x2_pow_32f_neon(float* cVector, const float* bVector,
+                         const float* aVector, unsigned int num_points)
+{
+    float* cPtr = cVector;
+    const float* aPtr = aVector;
+    const float* bPtr = bVector;
+    unsigned int number;
+    unsigned int quarter_points = num_points / 4;
+    float32x4_t c_vec;
+    float32x4_t a_vec;
+    float32x4_t b_vec;
+    
+    for(number = 0; number < quarter_points; number++) {
+        // load f32
+        a_vec = vld1q_f32(aPtr);
+        b_vec = vld1q_f32(bPtr);
+        // Prefetch next 4
+        __VOLK_PREFETCH(aPtr+4);
+        __VOLK_PREFETCH(bPtr+4);
+        c_vec = _vpowq_f32(a_vec, b_vec);
+        vst1q_f32(cPtr, c_vec);
+        // move pointers ahead
+        cPtr+=4;
+        aPtr+=4;
+        bPtr+=4;
+    }
+    
+    // deal with the rest
+    for(number = quarter_points * 4; number < num_points; number++) {
+        *cPtr++ = powf(*aPtr++, *bPtr++);
+    }
+}
+
+#endif /* LV_HAVE_NEON */
+
 #ifdef LV_HAVE_GENERIC
 
 static inline void
@@ -501,8 +500,8 @@ volk_32f_x2_pow_32f_generic(float* cVector, const float* bVector,
     *cPtr++ = powf(*aPtr++, *bPtr++);
   }
 }
-#endif /* LV_HAVE_GENERIC */
 
+#endif /* LV_HAVE_GENERIC */
 
 #ifdef LV_HAVE_SSE4_1
 #include <smmintrin.h>

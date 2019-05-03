@@ -57,6 +57,61 @@
 #include <stdio.h>
 #include <math.h>
 
+#ifdef LV_HAVE_NEON
+#include <arm_neon.h>
+#include <volk/volk_neon_intrinsics.h>
+
+static inline void
+volk_32fc_s32f_power_spectrum_32f_neon(float* logPowerOutput, const lv_32fc_t* complexFFTInput, const float normalizationFactor, unsigned int num_points)
+{
+    float* logPowerOutputPtr = logPowerOutput;
+    const lv_32fc_t* complexFFTInputPtr = complexFFTInput;
+    const float iNormalizationFactor = 1.0 / normalizationFactor;
+    unsigned int number;
+    unsigned int quarter_points = num_points / 4;
+    float32x4x2_t fft_vec;
+    float32x4_t log_pwr_vec;
+    float32x4_t mag_squared;
+    
+    const float32x4_t mag_vec = vdupq_n_f32(4.34294481903f); // 10.0/ln(10.)
+    const float32x4_t norm_vec = vdupq_n_f32(iNormalizationFactor);
+    
+    for(number = 0; number < quarter_points; number++) {
+        // load f32
+        fft_vec = vld2q_f32((float*)complexFFTInputPtr);
+        // Prefetch next 4
+        __VOLK_PREFETCH(complexFFTInputPtr+4);
+        // Normalize
+        fft_vec.val[0] = vmulq_f32(fft_vec.val[0], norm_vec);
+        fft_vec.val[1] = vmulq_f32(fft_vec.val[1], norm_vec);
+        
+        mag_squared = _vmagnitudesquaredq_f32(fft_vec);
+        log_pwr_vec = vmulq_f32(mag_vec, _vlogq_f32(mag_squared));
+        
+        vst1q_f32(logPowerOutputPtr, log_pwr_vec);
+        
+        // move pointers ahead
+        complexFFTInputPtr+=4;
+        logPowerOutputPtr+=4;
+    }
+    
+    // deal with the rest
+    for(number = quarter_points * 4; number < num_points; number++) {
+        // Calculate dBm
+        // 50 ohm load assumption
+        // 10 * log10 (v^2 / (2 * 50.0 * .001)) = 10 * log10( v^2 * 10)
+        // 75 ohm load assumption
+        // 10 * log10 (v^2 / (2 * 75.0 * .001)) = 10 * log10( v^2 * 15)
+        const float real = lv_creal(*complexFFTInputPtr) * iNormalizationFactor;
+        const float imag = lv_cimag(*complexFFTInputPtr) * iNormalizationFactor;
+        *logPowerOutputPtr = 10.0 * log10f(((real * real) + (imag * imag)) + 1e-20);
+        complexFFTInputPtr++;
+        logPowerOutputPtr++;
+    }
+}
+
+#endif /* LV_HAVE_NEON */
+
 #ifdef LV_HAVE_SSE3
 #include <pmmintrin.h>
 

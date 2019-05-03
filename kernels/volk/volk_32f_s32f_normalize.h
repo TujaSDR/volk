@@ -73,6 +73,36 @@
 #include <inttypes.h>
 #include <stdio.h>
 
+#ifdef LV_HAVE_NEON
+#include <arm_neon.h>
+
+static inline void volk_32f_s32f_normalize_neon(float* vecBuffer, const float scalar, unsigned int num_points)
+{
+    float* vecBufferPtr = vecBuffer;
+    const float invScalar = 1.0 / scalar;
+    unsigned int number = 0;
+    unsigned int quarter_points = num_points / 4;
+    
+    float32x4_t inoutVector;
+    const float32x4_t normVector = vdupq_n_f32(invScalar);
+    for(number = 0; number < quarter_points; number++){
+        inoutVector = vld1q_f32((float*)vecBufferPtr);
+        // Prefetch next
+        __VOLK_PREFETCH(vecBufferPtr+4);
+        inoutVector = vmulq_f32(inoutVector, normVector);
+        vst1q_f32((float*)vecBufferPtr, inoutVector);
+        vecBufferPtr += 4;
+    }
+    
+    for(number = quarter_points * 4; number < num_points; number++){
+        *vecBufferPtr *= invScalar;
+        vecBufferPtr++;
+    }
+}
+
+#endif /* LV_HAVE_NEON */
+
+
 #ifdef LV_HAVE_AVX
 #include <immintrin.h>
 

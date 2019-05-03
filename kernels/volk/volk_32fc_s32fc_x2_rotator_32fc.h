@@ -114,12 +114,12 @@ static inline void volk_32fc_s32fc_x2_rotator_32fc_neon(lv_32fc_t* outVector, co
     // Notice that incr has be incremented in the previous loop
     const lv_32fc_t incrPtr[4] = {incr, incr, incr, incr};
     
-    phase_vec = vld2q_f32((float32_t*) phasePtr); // 2 is the stride
-    incr_vec = vld2q_f32((float32_t*) incrPtr); // 2 is the stride
+    phase_vec = vld2q_f32((float*) phasePtr); // 2 is the stride
+    incr_vec = vld2q_f32((float*) incrPtr); // 2 is the stride
     
     for(i = 0; i < (unsigned int)(quarter_points/ROTATOR_RELOAD); i++) {
         for(j = 0; j < ROTATOR_RELOAD; j++) {
-            input_vec = vld2q_f32((float32_t*) inputVectorPtr);
+            input_vec = vld2q_f32((float*) inputVectorPtr);
             // Prefetch next one, speeds things up
             __VOLK_PREFETCH(inputVectorPtr+4);
             // Rotate
@@ -127,7 +127,7 @@ static inline void volk_32fc_s32fc_x2_rotator_32fc_neon(lv_32fc_t* outVector, co
             // Increase phase
             phase_vec = _vmultiply_complexq_f32(phase_vec, incr_vec);
             // Store output
-            vst2q_f32((float32_t*)outputVectorPtr, output_vec);
+            vst2q_f32((float*)outputVectorPtr, output_vec);
             
             outputVectorPtr+=4;
             inputVectorPtr+=4;
@@ -136,12 +136,13 @@ static inline void volk_32fc_s32fc_x2_rotator_32fc_neon(lv_32fc_t* outVector, co
         // floating point rounding error
         float32x4_t mag_squared = _vmagnitudesquaredq_f32(phase_vec);
         float32x4_t inv_mag = _vinvsqrtq_f32(mag_squared);
+        // Multiply complex with real
         phase_vec.val[0] = vmulq_f32(phase_vec.val[0], inv_mag);
         phase_vec.val[1] = vmulq_f32(phase_vec.val[1], inv_mag);
     }
-    
+
     for(i = 0; i < quarter_points % ROTATOR_RELOAD; ++i) {
-        input_vec = vld2q_f32((float32_t*) inputVectorPtr);
+        input_vec = vld2q_f32((float*) inputVectorPtr);
         // Prefetch next one, speeds things up
         __VOLK_PREFETCH(inputVectorPtr+4);
         // Rotate
@@ -149,17 +150,31 @@ static inline void volk_32fc_s32fc_x2_rotator_32fc_neon(lv_32fc_t* outVector, co
         // Increase phase
         phase_vec = _vmultiply_complexq_f32(phase_vec, incr_vec);
         // Store output
-        vst2q_f32((float32_t*)outputVectorPtr, output_vec);
+        vst2q_f32((float*)outputVectorPtr, output_vec);
         
         outputVectorPtr+=4;
         inputVectorPtr+=4;
     }
+    if (i) {
+        // normalize phase so magnitude doesn't grow because of
+        // floating point rounding error
+        float32x4_t mag_squared = _vmagnitudesquaredq_f32(phase_vec);
+        float32x4_t inv_mag = _vinvsqrtq_f32(mag_squared);
+        // Multiply complex with real
+        phase_vec.val[0] = vmulq_f32(phase_vec.val[0], inv_mag);
+        phase_vec.val[1] = vmulq_f32(phase_vec.val[1], inv_mag);
+    }
     
+    // Store current phase
+    vst2q_f32((float*)phasePtr, phase_vec);
     // Deal with the rest
     for(i = 0; i < num_points % 4; ++i) {
         *outputVectorPtr++ = *inputVectorPtr++ * phasePtr[0];
         phasePtr[0] *= (phase_inc);
     }
+    
+    // For continious phase
+    (*phase) = phasePtr[0];
 }
 
 #endif /* LV_HAVE_NEON */

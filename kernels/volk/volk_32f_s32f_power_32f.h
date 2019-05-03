@@ -75,6 +75,45 @@
 #include <stdio.h>
 #include <math.h>
 
+
+#ifdef LV_HAVE_NEON
+#include <arm_neon.h>
+#include <volk/volk_neon_intrinsics.h>
+
+static inline void
+volk_32f_s32f_power_32f_neon(float* cVector, const float* aVector,
+                             const float power, unsigned int num_points)
+{
+    float* cPtr = cVector;
+    const float* aPtr = aVector;
+    unsigned int number;
+    unsigned int quarter_points = num_points / 4;
+    float32x4_t c_vec;
+    float32x4_t a_vec;
+    
+    const float32x4_t power_vec = vdupq_n_f32(power);
+    
+    for(number = 0; number < quarter_points; number++) {
+        // load f32
+        a_vec = vld1q_f32(aPtr);
+        // Prefetch next 4
+        __VOLK_PREFETCH(aPtr+4);
+        c_vec = _vpowq_f32(a_vec, power_vec);
+        vst1q_f32(cPtr, c_vec);
+        // move pointers ahead
+        cPtr+=4;
+        aPtr+=4;
+    }
+    
+    // deal with the rest
+    for(number = quarter_points * 4; number < num_points; number++) {
+        *cPtr++ = powf(*aPtr++, power);
+    }
+}
+
+#endif /* LV_HAVE_NEON */
+
+
 #ifdef LV_HAVE_SSE4_1
 #include <tmmintrin.h>
 

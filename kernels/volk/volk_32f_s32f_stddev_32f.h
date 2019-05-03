@@ -73,6 +73,50 @@
 #include <stdio.h>
 #include <math.h>
 
+#ifdef LV_HAVE_NEON
+#include <arm_neon.h>
+
+static inline void
+volk_32f_s32f_stddev_32f_neon(float* stddev, const float* inputBuffer,
+                              const float mean, unsigned int num_points)
+{
+    unsigned int number = 0;
+    unsigned int quarter_points = num_points / 4;
+    const float* inputBufferPtr = inputBuffer;
+    float returnValue = 0;
+    
+    float32x4_t input_vec;
+    float32x4_t result_vec = vdupq_n_f32(0.f);
+    
+    // Quarter points
+    for(number = 0; number < quarter_points; number++) {
+        input_vec = vld1q_f32(inputBufferPtr);
+        // Prefetch next one, speeds things up
+        __VOLK_PREFETCH(inputBufferPtr+4);
+        result_vec = vmlaq_f32(result_vec, input_vec, input_vec);
+        // Move pointer ahead
+        inputBufferPtr+=4;
+    }
+    
+    // Sum lanes and store result back to returnValue
+    returnValue = _vsumq_f32(result_vec);
+    
+    // Deal with the rest
+    for(number = quarter_points * 4; number < num_points; number++) {
+        returnValue += (*inputBufferPtr) * (*inputBufferPtr);
+        inputBufferPtr++;
+    }
+    
+    returnValue /= num_points;
+    returnValue -= (mean * mean);
+    returnValue = sqrtf(returnValue);
+    
+    *stddev = returnValue;
+}
+
+#endif /* LV_HAVE_NEON */
+
+
 #ifdef LV_HAVE_SSE4_1
 #include <smmintrin.h>
 
