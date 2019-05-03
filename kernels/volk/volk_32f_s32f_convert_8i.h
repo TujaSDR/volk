@@ -91,6 +91,66 @@ volk_32f_s32f_convert_8i_single(int8_t* out, const float in){
   }
 }
 
+#ifdef LV_HAVE_NEON
+#include <arm_neon.h>
+#include <volk/volk_neon_intrinsics.h>
+
+static inline void
+volk_32f_s32f_convert_8i_neonv8(int8_t* outputVector,
+                                const float* inputVector,
+                                const float scalar,
+                                unsigned int num_points) {
+    int8_t* outputVectorPtr = outputVector;
+    const float* inputVectorPtr = inputVector;
+    unsigned int number;
+    unsigned int eights_points = num_points / 8;
+    float32x4_t input0_vec;
+    float32x4_t input1_vec;
+    int16x8_t ouput16_vec;
+    int8x8_t ouput8_vec;
+    
+    const float min_val = -128;
+    const float max_val = 127;
+    float r;
+    
+    const float32x4_t min_vec = vdupq_n_f32(min_val);
+    const float32x4_t max_vec = vdupq_n_f32(max_val);
+    const float32x4_t scalar_vec = vdupq_n_f32(scalar);
+    
+    for(number = 0; number < eights_points; number++) {
+        // load f32
+        input0_vec = vld1q_f32(inputVectorPtr);
+        inputVectorPtr+=4;
+        input1_vec = vld1q_f32(inputVectorPtr);
+        inputVectorPtr+=4;
+        // Prefetch next 8
+        __VOLK_PREFETCH(inputVectorPtr+8);
+        // scale and clamp
+        input0_vec = vmulq_f32(input0_vec, scalar_vec);
+        input0_vec = _vclampq_f32(input0_vec, min_vec, max_vec);
+        input1_vec = vmulq_f32(input1_vec, scalar_vec);
+        input1_vec = _vclampq_f32(input1_vec, min_vec, max_vec);
+        
+        // narrow to 16bits and combine
+        ouput16_vec = vcombine_s16(vmovn_s32(vcvtnq_s32_f32(input0_vec)),
+                                   vmovn_s32(vcvtnq_s32_f32(input1_vec)));
+        // narrow to 8 bits
+        ouput8_vec = vmovn_s16(ouput16_vec);
+        // store
+        vst1_s8(outputVectorPtr, ouput8_vec);
+        // move output pointer ahead
+        outputVectorPtr+=8;
+    }
+    
+    // deal with the rest
+    for(number = eights_points * 8; number < num_points; number++) {
+        r = (*inputVectorPtr++) * scalar;
+        volk_32f_s32f_convert_8i_single(outputVectorPtr++, r);
+    }
+}
+#endif /* LV_HAVE_NEON */
+
+
 #ifdef LV_HAVE_AVX2
 #include <immintrin.h>
 

@@ -73,6 +73,66 @@
 #include <stdio.h>
 #include <math.h>
 
+#ifdef LV_HAVE_NEONV8
+#include <arm_neon.h>
+#include <volk/volk_neon_intrinsics.h>
+
+static inline void
+volk_32f_s32f_convert_16i_neonv8(int16_t* outputVector,
+                                 const float* inputVector,
+                                 const float scalar,
+                                 unsigned int num_points) {
+    int16_t* outputVectorPtr = outputVector;
+    const float* inputVectorPtr = inputVector;
+    unsigned int number;
+    unsigned int quarter_points = num_points / 4;
+    float32x4_t input_vec;
+    int32x4_t ouput32_vec;
+    int16x4_t ouput16_vec;
+    
+    const float min_val = -32768;
+    const float max_val = 32767;
+    float r;
+    
+    const float32x4_t min_vec = vdupq_n_f32(min_val);
+    const float32x4_t max_vec = vdupq_n_f32(max_val);
+    const float32x4_t scalar_vec = vdupq_n_f32(scalar);
+    
+    for(number = 0; number < quarter_points; number++) {
+        // load f32
+        input_vec = vld1q_f32(inputVectorPtr);
+        // Prefetch next 4
+        __VOLK_PREFETCH(inputVectorPtr+4);
+        // scale, this is saturating
+        // there seems to be no point in clamping to min max here?
+        input_vec = vmulq_f32(input_vec, scalar_vec);
+        input_vec = _vclampq_f32(input_vec, min_vec, max_vec);
+        // convert f32 to s32
+        // vcvtnq_s32_f32 is new in neonv8
+        // rounding to nearest with ties to even
+        ouput32_vec = vcvtnq_s32_f32(input_vec);
+        // narrow to 16 bits
+        ouput16_vec = vmovn_s32(ouput32_vec);
+        // store
+        vst1_s16(outputVectorPtr, ouput16_vec);
+        // move pointers ahead
+        outputVectorPtr+=4;
+        inputVectorPtr+=4;
+    }
+    
+    // deal with the rest
+    for(number = quarter_points * 4; number < num_points; number++) {
+        r = *inputVectorPtr++ * scalar;
+        if(r > max_val)
+            r = max_val;
+        else if(r < min_val)
+            r = min_val;
+        *outputVectorPtr++ = (int16_t)rintf(r);
+    }
+}
+#endif /* LV_HAVE_NEONV8 */
+
+
 #ifdef LV_HAVE_AVX2
 #include <immintrin.h>
 

@@ -75,6 +75,7 @@
 
 #ifdef LV_HAVE_NEONV8
 #include <arm_neon.h>
+#include <volk/volk_neon_intrinsics.h>
 
 static inline void
 volk_32f_s32f_convert_32i_neonv8(int32_t* outputVector,
@@ -92,6 +93,8 @@ volk_32f_s32f_convert_32i_neonv8(int32_t* outputVector,
     float max_val = 2147483647;
     float r;
     
+    const float32x4_t min_vec = vdupq_n_f32(min_val);
+    const float32x4_t max_vec = vdupq_n_f32(max_val);
     const float32x4_t scalar_vec = vdupq_n_f32(scalar);
     
     for(number = 0; number < quarter_points; number++) {
@@ -99,9 +102,8 @@ volk_32f_s32f_convert_32i_neonv8(int32_t* outputVector,
         input_vec = vld1q_f32(inputVectorPtr);
         // Prefetch next 4
         __VOLK_PREFETCH(inputVectorPtr+4);
-        // scale, this is saturating
-        // there seems to be no point in clamping to min max here?
         input_vec = vmulq_f32(input_vec, scalar_vec);
+        input_vec = _vclampq_f32(input_vec, min_vec, max_vec);
         // convert f32 to s32
         // vcvtnq_s32_f32 is new in neonv8
         // rounding to nearest with ties to even

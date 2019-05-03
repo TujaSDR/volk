@@ -110,7 +110,6 @@ volk_32f_tan_32f_neon(float* bVector, const float* aVector,
         *bVectorPtr++ = tanf(*aVectorPtr++);
     }
 }
-
 #endif /* LV_HAVE_NEON */
 
 #if LV_HAVE_AVX2 && LV_HAVE_FMA

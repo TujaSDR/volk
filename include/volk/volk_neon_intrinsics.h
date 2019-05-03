@@ -258,6 +258,18 @@ _vsumq_f32(float32x4_t vec)
     return vget_lane_f32(tmp2, 0);
 }
 
+static inline float32x4_t
+_vclampq_f32(float32x4_t vec, float32x4_t min_vec, float32x4_t max_vec)
+{
+    return vminq_f32(vmaxq_f32(vec, min_vec), max_vec);
+}
+
+static inline int32x4_t
+_vclampq_s32(int32x4_t vec, int32x4_t min_vec, int32x4_t max_vec)
+{
+    return vminq_s32(vmaxq_s32(vec, min_vec), max_vec);
+}
+
 static inline float32x4x2_t
 _vmultiply_complexq_f32(float32x4x2_t a_val, float32x4x2_t b_val)
 {
