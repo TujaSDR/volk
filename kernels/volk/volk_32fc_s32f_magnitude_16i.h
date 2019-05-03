@@ -78,6 +78,51 @@
 #include <stdio.h>
 #include <math.h>
 
+#ifdef LV_HAVE_NEONV8
+#include <arm_neon.h>
+#include <volk/volk_neon_intrinsics.h>
+
+static inline void
+volk_32fc_s32f_magnitude_16i_neonv8(int16_t* magnitudeVector, const lv_32fc_t* complexVector, const float scalar, unsigned int num_points) {
+    
+    unsigned int number = 0;
+    unsigned int quarter_points = num_points / 4;
+    const lv_32fc_t* complexVectorPtr = complexVector;
+    int16_t* magnitudeVectorPtr = magnitudeVector;
+    
+    float32x4x2_t input_vec;
+    float32x4_t mag_vec;
+    int16x4_t output_vec;
+    
+    for(number = 0; number < quarter_points; number++) {
+        input_vec = vld2q_f32((float*)complexVectorPtr);
+        // Prefetch next one, speeds things up
+        __VOLK_PREFETCH(complexVectorPtr+4);
+        // scale real and imag parts
+        input_vec.val[0] = vmulq_n_f32(input_vec.val[0], scalar);
+        input_vec.val[1] = vmulq_n_f32(input_vec.val[1], scalar);
+        mag_vec = vsqrtq_f32(_vmagnitudesquaredq_f32(input_vec));
+        // convert to int32 and narrow to int16
+        output_vec = vmovn_s32(vcvtnq_s32_f32(mag_vec));
+        // store
+        vst1_s16(magnitudeVectorPtr, output_vec);
+        // move pointers ahead
+        complexVectorPtr+=4;
+        magnitudeVectorPtr+=4;
+    }
+    
+    // Deal with the rest
+    for(number = quarter_points * 4; number < num_points; number++) {
+        const float real = lv_creal(*complexVectorPtr);
+        const float imag = lv_cimag(*complexVectorPtr);
+        *magnitudeVectorPtr = (int16_t)rintf(sqrtf((real*real) + (imag*imag)) * scalar);
+        complexVectorPtr++;
+        magnitudeVectorPtr++;
+    }
+}
+#endif /* LV_HAVE_NEONV8 */
+
+
 #ifdef LV_HAVE_AVX2
 #include <immintrin.h>
 

@@ -66,6 +66,39 @@
 #include <volk/volk_common.h>
 #include <inttypes.h>
 
+#ifdef LV_HAVE_NEON
+#include <arm_neon.h>
+#include <volk/volk_neon_intrinsics.h>
+
+static void inline
+volk_32f_accumulator_s32f_neon(float* result, const float* inputBuffer, unsigned int num_points) {
+    
+    unsigned int number = 0;
+    unsigned int quarter_points = num_points / 4;
+    const float* inputBufferPtr = inputBuffer;
+    float returnValue = 0;
+    
+    float32x4_t input_vec;
+    float32x4_t acc_vec;
+    
+    for(number = 0; number < quarter_points; number++) {
+        input_vec = vld1q_f32(inputBufferPtr);
+        // Prefetch next one, speeds things up
+        __VOLK_PREFETCH(inputBufferPtr+4);
+        acc_vec = vaddq_f32(acc_vec, input_vec);
+        // move pointer ahead
+        inputBufferPtr+=4;
+    }
+    returnValue = _vsumq_f32(acc_vec);
+    // Deal with the rest
+    for(number = quarter_points * 4; number < num_points; number++) {
+        returnValue += (*inputBufferPtr++);
+    }
+    *result = returnValue;
+}
+#endif /* LV_HAVE_NEON */
+
+
 #ifdef LV_HAVE_AVX
 #include <immintrin.h>
 

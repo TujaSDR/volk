@@ -235,7 +235,7 @@ volk_32f_s32f_multiply_32f_a_avx(float* cVector, const float* aVector,
 #include <arm_neon.h>
 
 static inline void
-volk_32f_s32f_multiply_32f_u_neon(float* cVector, const float* aVector,
+volk_32f_s32f_multiply_32f_neon(float* cVector, const float* aVector,
                                   const float scalar, unsigned int num_points)
 {
   unsigned int number = 0;
@@ -247,7 +247,7 @@ volk_32f_s32f_multiply_32f_u_neon(float* cVector, const float* aVector,
 
   for(number = 0; number < quarterPoints; number++){
     aVal = vld1q_f32(inputPtr); // Load into NEON regs
-    cVal = vmulq_n_f32 (aVal, scalar); // Do the multiply
+    cVal = vmulq_n_f32(aVal, scalar); // Do the multiply
     vst1q_f32(outputPtr, cVal); // Store results back to output
     inputPtr += 4;
     outputPtr += 4;
