@@ -78,6 +78,49 @@
 #include <stdio.h>
 #include <math.h>
 
+#ifdef LV_HAVE_NEON
+#include <arm_neon.h>
+#include <volk/volk_neon_intrinsics.h>
+
+static inline void
+volk_32fc_s32f_atan2_32f_neon(float* outputVector, const lv_32fc_t* inputVector,
+                              const float normalizeFactor, unsigned int num_points) {
+    
+    unsigned int number = 0;
+    unsigned int quarter_points = num_points / 4;
+    float* outputVectorPtr = outputVector;
+    const float invNormalizeFactor = 1.0 / normalizeFactor;
+    const lv_32fc_t* inputVectorPtr = inputVector;
+    
+    float32x4x2_t in_vec;
+    float32x4_t out_vec;
+    
+    for(number = 0; number < quarter_points; number++) {
+        in_vec = vld2q_f32((float*)inputVectorPtr);
+        // Prefetch next one, speeds things up
+        __VOLK_PREFETCH(inputVectorPtr+4);
+        // Normalize
+        out_vec = _vatan2q_f32(in_vec.val[1], in_vec.val[0]);
+        // Normalize
+        out_vec = vmulq_n_f32(out_vec, invNormalizeFactor);
+        vst1q_f32(outputVectorPtr, out_vec);
+        // move pointers ahead
+        outputVectorPtr+=4;
+        inputVectorPtr+=4;
+    }
+    
+    // Deal with the rest
+    for(number = quarter_points * 4; number < num_points; number++) {
+        const float real = lv_creal(*inputVectorPtr);
+        const float imag = lv_cimag(*inputVectorPtr);
+        *outputVectorPtr = atan2f(imag, real) * invNormalizeFactor;
+        outputVectorPtr++;
+        inputVectorPtr++;
+    }
+}
+#endif /* LV_HAVE_NEON */
+
+
 #ifdef LV_HAVE_SSE4_1
 #include <smmintrin.h>
 

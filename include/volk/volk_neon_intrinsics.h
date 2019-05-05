@@ -30,9 +30,16 @@
 
 #include <arm_neon.h>
 
-/* Adapted from ARM Compute Library MIT license */
+/*
+ static inline float32x4_t _vinvsqrtq_neonv8_f32(float32x4_t x) {
+ // vsqrtq_f32 is new in armv8
+ float32x4_t sqrt_reciprocal = _vinvq_f32(vsqrtq_f32(x));
+ return sqrt_reciprocal;
+ }*/
+
 static inline float32x4_t _vinvq_f32(float32x4_t x)
 {
+    // Newton's method
     float32x4_t recip = vrecpeq_f32(x);
     recip             = vmulq_f32(vrecpsq_f32(x, recip), recip);
     recip             = vmulq_f32(vrecpsq_f32(x, recip), recip);
@@ -45,19 +52,10 @@ _vmagnitudesquaredq_f32(float32x4x2_t cmplxValue)
     float32x4_t iValue, qValue, result;
     iValue = vmulq_f32(cmplxValue.val[0], cmplxValue.val[0]); // Square the values
     qValue = vmulq_f32(cmplxValue.val[1], cmplxValue.val[1]); // Square the values
-    
     result = vaddq_f32(iValue, qValue); // Add the I2 and Q2 values
     return result;
 }
 
-/*
-static inline float32x4_t _vinvsqrtq_neonv8_f32(float32x4_t x) {
-    // vsqrtq_f32 is new in armv8
-    float32x4_t sqrt_reciprocal = _vinvq_f32(vsqrtq_f32(x));
-    return sqrt_reciprocal;
-}*/
-
-/* Adapted from ARM Compute Library MIT license */
 static inline float32x4_t _vinvsqrtq_f32(float32x4_t x)
 {
     float32x4_t sqrt_reciprocal = vrsqrteq_f32(x);
@@ -65,6 +63,13 @@ static inline float32x4_t _vinvsqrtq_f32(float32x4_t x)
     sqrt_reciprocal = vmulq_f32(vrsqrtsq_f32(vmulq_f32(x, sqrt_reciprocal), sqrt_reciprocal), sqrt_reciprocal);
     
     return sqrt_reciprocal;
+}
+
+/* armv8 has vsqrtq_f32
+ WARNING: does not handle 0 well, needs work */
+static inline float32x4_t _vsqrtq_f32(float32x4_t x)
+{
+    return _vinvq_f32(_vinvsqrtq_f32(x));
 }
 
 /* Adapted from ARM Compute Library MIT license */
@@ -113,21 +118,155 @@ static inline float32x4_t _vexpq_f32(float32x4_t x)
     return poly;
 }
 
-/* evaluation of 4 sines & cosines at once.
- 
- The code is the exact rewriting of the cephes sinf function.
- Precision is excellent as long as x < 8192 (I did not bother to
- take into account the special handling they have for greater values
- -- it does not return garbage for arguments over 8192, though, but
- the extra precision is missing).
- 
- Note that it is such that sinf((float)M_PI) = 8.74e-8, which is the
- surprising but correct result.
- 
- Note also that when you compute sin(x), cos(x) is available at
- almost no extra price so both sin_ps and cos_ps make use of
- sincos_ps..
- */
+// floor a float32x4_t
+static inline float32x4_t vfloorq_f32(float32x4_t val)
+{
+    const float32x4_t CONST_1 = vdupq_n_f32(1.f);
+    const int32x4_t   z = vcvtq_s32_f32(val);
+    const float32x4_t r = vcvtq_f32_s32(z);
+    return vbslq_f32(vcgtq_f32(r, val), vsubq_f32(r, CONST_1), r);
+}
+
+/* Adapted from Cephes math library */
+static inline float32x4_t _vasinq_f32(float32x4_t x) {
+    const float32x4_t CONST_0          = vdupq_n_f32(0.f);
+    const float32x4_t CONST_1e_4       = vdupq_n_f32(1.0e-4);
+    const float32x4_t CONST_05         = vdupq_n_f32(0.5f);
+    const float32x4_t CONST_PI_2       = vdupq_n_f32(M_PI/2);
+    
+    const uint32x4_t sign = vcgtq_f32(x, CONST_0);
+    float32x4_t abs_x = vabsq_f32(x);
+    
+    const uint32x4_t abs_x_gt_05 = vcgtq_f32(abs_x, CONST_05);
+    const uint32x4_t abs_x_lt_1e_4 = vcltq_f32(abs_x, CONST_1e_4);
+    
+    float32x4_t z = vbslq_f32(abs_x_gt_05, 0.5 * (1.0 - abs_x), abs_x * abs_x);
+    x = vbslq_f32(abs_x_gt_05, _vsqrtq_f32(z), abs_x);
+    
+    const float32x4_t c4 = vdupq_n_f32(4.2163199048e-2);
+    const float32x4_t c3 = vdupq_n_f32(2.4181311049e-2);
+    const float32x4_t c2 = vdupq_n_f32(4.5470025998e-2);
+    const float32x4_t c1 = vdupq_n_f32(7.4953002686e-2);
+    const float32x4_t c0 = vdupq_n_f32(1.6666752422e-1);
+    
+    // Evaluate polynomial
+    // Compiler seems to vectorize these kind of expresssions correctly
+    // But should replace this with vmlaq_f32()
+    z = (((( c4 * z + c3) * z + c2) * z + c1) * z + c0) * z * x + x;
+    
+    // Reconstruct
+    z = vbslq_f32(abs_x_gt_05, CONST_PI_2 - 2 * z, z);
+    z = vbslq_f32(abs_x_lt_1e_4, abs_x, z);
+    z = vbslq_f32(sign, z, vnegq_f32(z));
+    
+    return z;
+}
+
+/* https://stackoverflow.com/questions/46974513/code-for-acos-with-avx256 */
+static inline float32x4_t _vacos2q_f32(float32x4_t x) {
+    const float32x4_t CONST_0    = vdupq_n_f32(0.f);
+    const float32x4_t CONST_1    = vdupq_n_f32(1.f);
+    const float32x4_t CONST_PI   = vdupq_n_f32(M_PI);
+    const float32x4_t abs_x      = vabsq_f32(x);
+    
+    const uint32x4_t sign = vcgtq_f32(x, CONST_0);
+    
+    float32x4_t t = vsqrtq_f32(CONST_1 - abs_x);
+    
+    // Polynomial correction factor based on xp
+    // TODO: try to find better coefficients
+    const float32x4_t c3 = vdupq_n_f32(-0.02007522f);
+    const float32x4_t c2 = vmlaq_f32(vdupq_n_f32(0.07590315f), abs_x, c3);
+    const float32x4_t c1 = vmlaq_f32(vdupq_n_f32(-0.2126757f), abs_x, c2);
+    const float32x4_t c0 = vmlaq_f32(vdupq_n_f32(1.5707963267948966f), abs_x, c1);
+    
+    // Positive
+    float32x4_t p = t * c0;
+    // Correct for negative
+    float32x4_t n = CONST_PI - p;
+    
+    return vbslq_f32(sign, p, n);
+}
+
+/* Efficient Approximations for the Arctangent Function [dsp TIPS&TRICKS] */
+static inline float32x4_t _vatanfastq_f32(float32x4_t x) {
+    const float32x4_t CONST_1 = vdupq_n_f32(1.f);
+    const float32x4_t CONST_0273 = vdupq_n_f32(0.273);
+    const float32x4_t CONST_PI_4 = vdupq_n_f32(0.78539816339f);
+    const float32x4_t y = CONST_PI_4 * x + CONST_0273 * x * (CONST_1 - vabsq_f32(x));
+    return y;
+}
+
+/* atan */
+static inline float32x4_t _vatanq_f32(float32x4_t x) {
+    const float32x4_t CONST_0          = vdupq_n_f32(0.f);
+    const float32x4_t CONST_1 = vdupq_n_f32(1.f);
+    const float32x4_t CONST_TAN_3_PI_8 = vdupq_n_f32(2.41421356237f);
+    const float32x4_t CONST_TAN_PI_8   = vdupq_n_f32(0.41421356237f);
+    const float32x4_t CONST_PI_2       = vdupq_n_f32(M_PI/2);
+    const float32x4_t CONST_PI_4       = vdupq_n_f32(M_PI/4);
+
+    float32x4_t y = vdupq_n_f32(0.f);
+    float32x4_t x1, x2;
+    uint32x4_t gt_mask;
+    
+    // x < 0
+    const uint32x4_t sign_mask = vcltq_f32(x, CONST_0);
+    x = vabsq_f32(x);
+
+    x1  = vnegq_f32(_vinvq_f32(x));
+    x2 = vmulq_f32(vsubq_f32(x, CONST_1),
+                   _vinvq_f32(vaddq_f32(x, CONST_1)));
+    
+    // a > b
+    gt_mask = vcgtq_f32(x, CONST_TAN_PI_8);
+    y = vbslq_f32(gt_mask, CONST_PI_4, y);
+    x = vbslq_f32(gt_mask, x2, x);
+    
+    gt_mask = vcgtq_f32(x, CONST_TAN_3_PI_8);
+    y = vbslq_f32(gt_mask, CONST_PI_2, y);
+    x = vbslq_f32(gt_mask, x1, x);
+    
+    float32x4_t z = x * x;
+    
+    const float32x4_t c3 = vdupq_n_f32(8.05374449538e-2);
+    const float32x4_t c2 = vdupq_n_f32(1.38776856032e-1);
+    const float32x4_t c1 = vdupq_n_f32(1.99777106478e-1);
+    const float32x4_t c0 = vdupq_n_f32(3.33329491539e-1);
+
+    y += ((( c3 * z - c2) * z + c1) * z - c0) * z * x + x;
+    
+    y = vbslq_f32(sign_mask, vnegq_f32(y), y);
+
+    return y;
+}
+
+static inline float32x4_t _vatan2q_f32(float32x4_t y, float32x4_t x) {
+    // Adjusts atan to the right quadrant
+    const float32x4_t CONST_0    = vdupq_n_f32(0.f);
+    const float32x4_t CONST_PI   = vdupq_n_f32(M_PI);
+    const float32x4_t CONST_PI_2 = vdupq_n_f32(M_PI/2.f);
+    const float32x4_t CONST_NEG_PI_2 = vdupq_n_f32(-M_PI/2.f);
+
+    const float32x4_t atan_y_x      = _vatanq_f32(vmulq_f32(y, _vinvq_f32(x)));
+    const float32x4_t atan_y_x_p_pi = atan_y_x + CONST_PI;
+    const float32x4_t atan_y_x_m_pi = atan_y_x - CONST_PI;
+
+    uint32x4_t x_gt_0 = vcgtq_f32(x, CONST_0);
+    uint32x4_t x_lt_0 = vcltq_f32(x, CONST_0);
+    uint32x4_t y_ge_0 = vcgeq_f32(y, CONST_0);
+    
+    // Select the right value based on quadrant
+    // This is a bit tricky but look at the definition of atan2
+    float32x4_t res = vbslq_f32(x_gt_0, atan_y_x,
+                                vbslq_f32(x_lt_0,
+                                          vbslq_f32(y_ge_0, atan_y_x_p_pi, atan_y_x_m_pi),
+                                          vbslq_f32(y_ge_0, CONST_PI_2, CONST_NEG_PI_2)));
+    
+    return res;
+}
+
+/* evaluation of 4 sines & cosines at once. */
 static inline void _vsincosq_f32(float32x4_t x,
                                  float32x4_t *ysin,
                                  float32x4_t *ycos) { // any x
@@ -191,21 +330,23 @@ static inline void _vsincosq_f32(float32x4_t x,
     float32x4_t z = vmulq_f32(x,x);
     float32x4_t y1, y2;
     
+    // Can probably be reduced to some multiply accumulate
     y1 = vmulq_f32(z, c_coscof_p0);
-    y2 = vmulq_f32(z, c_sincof_p0);
     y1 = vaddq_f32(y1, c_coscof_p1);
-    y2 = vaddq_f32(y2, c_sincof_p1);
     y1 = vmulq_f32(y1, z);
-    y2 = vmulq_f32(y2, z);
     y1 = vaddq_f32(y1, c_coscof_p2);
-    y2 = vaddq_f32(y2, c_sincof_p2);
     y1 = vmulq_f32(y1, z);
-    y2 = vmulq_f32(y2, z);
     y1 = vmulq_f32(y1, z);
-    y2 = vmulq_f32(y2, x);
     y1 = vsubq_f32(y1, vmulq_f32(z, CONST_05));
-    y2 = vaddq_f32(y2, x);
     y1 = vaddq_f32(y1, CONST_1);
+    
+    y2 = vmulq_f32(z, c_sincof_p0);
+    y2 = vaddq_f32(y2, c_sincof_p1);
+    y2 = vmulq_f32(y2, z);
+    y2 = vaddq_f32(y2, c_sincof_p2);
+    y2 = vmulq_f32(y2, z);
+    y2 = vmulq_f32(y2, x);
+    y2 = vaddq_f32(y2, x);
     
     /* select the correct result from the two polynoms */
     float32x4_t ys = vbslq_f32(poly_mask, y1, y2);
@@ -295,7 +436,8 @@ _vmultiply_complexq_f32(float32x4x2_t a_val, float32x4x2_t b_val)
     return c_val;
 }
 
-/* Adapted from ARM Compute Library MIT license */
+/* Adapted from ARM Compute Library MIT license
+ * Natural logarithm */
 static inline float32x4_t _vlogq_f32(float32x4_t x)
 {
     const float32x4_t log_tab[8] = {
@@ -323,6 +465,11 @@ static inline float32x4_t _vlogq_f32(float32x4_t x)
     poly = vmlaq_f32(poly, vcvtq_f32_s32(m), CONST_LN2);
     
     return poly;
+}
+
+static inline float32x4_t _vlog2q_f32(float32x4_t x) {
+    const float32x4_t CONST_1_LN2 = vdupq_n_f32(1.44269504089); // 1/ln(2)
+    return vmulq_f32(_vlogq_f32(x), CONST_1_LN2);
 }
 
 /* Adapted from ARM Compute Library MIT license */

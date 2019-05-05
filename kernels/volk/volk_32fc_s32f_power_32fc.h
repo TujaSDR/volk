@@ -137,6 +137,51 @@ volk_32fc_s32f_power_32fc_a_sse(lv_32fc_t* cVector, const lv_32fc_t* aVector,
 }
 #endif /* LV_HAVE_SSE */
 
+#ifdef LV_HAVE_NEON
+#include <arm_neon.h>
+#include <volk/volk_neon_intrinsics.h>
+
+static inline void
+volk_32fc_s32f_power_32fc_neon(lv_32fc_t* cVector, const lv_32fc_t* aVector,
+                               const float power, unsigned int num_points) {
+    
+    unsigned int number = 0;
+    unsigned int quarter_points = num_points / 4;
+    lv_32fc_t* cVectorPtr = cVector;
+    const lv_32fc_t* aVectorPtr = aVector;
+    
+    const float32x4_t pow_2_vec = vdupq_n_f32(power/2.);
+    float32x4x2_t in_vec;
+    float32x4_t arg_vec;
+    float32x4_t mag_vec;
+    float32x4x2_t out_vec;
+    
+    for(number = 0; number < quarter_points; number++) {
+        in_vec = vld2q_f32((float*)aVectorPtr);
+        // Prefetch next one, speeds things up
+        __VOLK_PREFETCH(aVectorPtr+4);
+        // Raise to power
+        arg_vec = vmulq_n_f32(_vatan2q_f32(in_vec.val[0], in_vec.val[1]), power);
+        // power/2 because we have magnitude squared
+        mag_vec = _vpowq_f32(_vmagnitudesquaredq_f32(in_vec), pow_2_vec);
+        // Convert back to cartesian
+        _vsincosq_f32(arg_vec, &out_vec.val[1], &out_vec.val[0]);
+        // mag*lv_cmake(-cosf(arg), sinf(arg))
+        out_vec.val[0] = vnegq_f32(vmulq_f32(out_vec.val[0], mag_vec));
+        out_vec.val[1] = vmulq_f32(out_vec.val[1], mag_vec);
+        // Store
+        vst2q_f32((float*)cVectorPtr, out_vec);
+        // move pointers ahead
+        cVectorPtr+=4;
+        aVectorPtr+=4;
+    }
+    
+    // Deal with the rest
+    for(number = quarter_points * 4; number < num_points; number++) {
+        *cVectorPtr++ = __volk_s32fc_s32f_power_s32fc_a((*aVectorPtr++), power);
+    }
+}
+#endif /* LV_HAVE_NEON */
 
 #ifdef LV_HAVE_GENERIC
 
