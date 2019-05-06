@@ -98,11 +98,10 @@ static inline void volk_32fc_s32fc_x2_rotator_32fc_neon(lv_32fc_t* outVector, co
     const lv_32fc_t* inputVectorPtr = inVector;
     lv_32fc_t incr = 1;
     lv_32fc_t phasePtr[4] = {(*phase), (*phase), (*phase), (*phase)};
-    
     float32x4x2_t input_vec;
     float32x4x2_t output_vec;
-    float32x4x2_t phase_vec;
-    float32x4x2_t incr_vec;
+    // float32x4x2_t phase_vec;
+    // float32x4x2_t incr_vec;
     
     unsigned int i = 0, j = 0;
     const unsigned int quarter_points = num_points / 4;
@@ -111,11 +110,11 @@ static inline void volk_32fc_s32fc_x2_rotator_32fc_neon(lv_32fc_t* outVector, co
         phasePtr[i] *= incr;
         incr *= (phase_inc);
     }
+    
     // Notice that incr has be incremented in the previous loop
     const lv_32fc_t incrPtr[4] = {incr, incr, incr, incr};
-    
-    phase_vec = vld2q_f32((float*) phasePtr); // 2 is the stride
-    incr_vec = vld2q_f32((float*) incrPtr); // 2 is the stride
+    const float32x4x2_t incr_vec = vld2q_f32((float*) incrPtr);
+    float32x4x2_t phase_vec = vld2q_f32((float*) phasePtr);
     
     for(i = 0; i < (unsigned int)(quarter_points/ROTATOR_RELOAD); i++) {
         for(j = 0; j < ROTATOR_RELOAD; j++) {
@@ -155,6 +154,7 @@ static inline void volk_32fc_s32fc_x2_rotator_32fc_neon(lv_32fc_t* outVector, co
         outputVectorPtr+=4;
         inputVectorPtr+=4;
     }
+    // if(i) == true means we looped above
     if (i) {
         // normalize phase so magnitude doesn't grow because of
         // floating point rounding error
@@ -164,16 +164,16 @@ static inline void volk_32fc_s32fc_x2_rotator_32fc_neon(lv_32fc_t* outVector, co
         phase_vec.val[0] = vmulq_f32(phase_vec.val[0], inv_mag);
         phase_vec.val[1] = vmulq_f32(phase_vec.val[1], inv_mag);
     }
-    
     // Store current phase
     vst2q_f32((float*)phasePtr, phase_vec);
+
     // Deal with the rest
     for(i = 0; i < num_points % 4; ++i) {
         *outputVectorPtr++ = *inputVectorPtr++ * phasePtr[0];
         phasePtr[0] *= (phase_inc);
     }
     
-    // For continious phase
+    // For continious phase next time we need to call this function
     (*phase) = phasePtr[0];
 }
 

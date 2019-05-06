@@ -73,8 +73,9 @@ volk_32fc_s32f_power_spectrum_32f_neon(float* logPowerOutput, const lv_32fc_t* c
     float32x4_t log_pwr_vec;
     float32x4_t mag_squared;
     
-    const float32x4_t mag_vec = vdupq_n_f32(4.34294481903f); // 10.0/ln(10.)
-    const float32x4_t norm_vec = vdupq_n_f32(iNormalizationFactor);
+    const float magmult = 4.34294481903f; // 10.0/ln(10.)
+    //const float32x4_t mag_vec = vdupq_n_f32(4.34294481903f); // 10.0/ln(10.)
+    //const float32x4_t norm_vec = vdupq_n_f32(iNormalizationFactor);
     
     for(number = 0; number < quarter_points; number++) {
         // load f32
@@ -82,11 +83,13 @@ volk_32fc_s32f_power_spectrum_32f_neon(float* logPowerOutput, const lv_32fc_t* c
         // Prefetch next 4
         __VOLK_PREFETCH(complexFFTInputPtr+4);
         // Normalize
-        fft_vec.val[0] = vmulq_f32(fft_vec.val[0], norm_vec);
-        fft_vec.val[1] = vmulq_f32(fft_vec.val[1], norm_vec);
-        
+        //fft_vec.val[0] = vmulq_f32(fft_vec.val[0], norm_vec);
+        //fft_vec.val[1] = vmulq_f32(fft_vec.val[1], norm_vec);
+        fft_vec.val[0] = vmulq_n_f32(fft_vec.val[0], iNormalizationFactor);
+        fft_vec.val[1] = vmulq_n_f32(fft_vec.val[1], iNormalizationFactor);
         mag_squared = _vmagnitudesquaredq_f32(fft_vec);
-        log_pwr_vec = vmulq_f32(mag_vec, _vlogq_f32(mag_squared));
+        //log_pwr_vec = vmulq_f32(mag_vec, _vlogq_f32(mag_squared));
+        log_pwr_vec = vmulq_n_f32(_vlogq_f32(mag_squared), magmult);
         
         vst1q_f32(logPowerOutputPtr, log_pwr_vec);
         
