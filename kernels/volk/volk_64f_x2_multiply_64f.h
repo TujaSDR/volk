@@ -252,4 +252,38 @@ volk_64f_x2_multiply_64f_a_avx(double *cVector, const double *aVector,
 
 #endif /* LV_HAVE_AVX */
 
+#ifdef LV_HAVE_NEONV8
+#include <arm_neon.h>
+
+static inline void
+volk_64f_x2_multiply_64f_neonv8(double *cVector, const double *aVector,
+                                const double *bVector, unsigned int num_points) {
+    unsigned int number = 0;
+    unsigned int half_points = num_points / 2;
+    
+    double* cVectorPtr = cVector;
+    const double *aVectorPtr = aVector;
+    const double *bVectorPtr = bVector;
+    
+    float64x2_t c_vec, a_vec, b_vec;
+    
+    for(number = 0; number < half_points; number++) {
+        a_vec = vld1q_f64(aVectorPtr);
+        b_vec = vld1q_f64(bVectorPtr);
+        c_vec = vmulq_f64(a_vec, b_vec);
+        vst1q_f64(cVectorPtr, c_vec);
+        
+        cVectorPtr+=2;
+        aVectorPtr+=2;
+        bVectorPtr+=2;
+    }
+    
+    // Deal with the rest
+    for(number = half_points * 2; number < num_points; number++) {
+        *cVectorPtr++ = (*aVectorPtr++) * (*bVectorPtr++);
+    }
+}
+
+#endif /* LV_HAVE_NEONV8 */
+
 #endif /* INCLUDED_volk_64f_x2_multiply_64f_u_H */

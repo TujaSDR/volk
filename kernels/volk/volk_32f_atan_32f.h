@@ -98,6 +98,7 @@ volk_32f_atan_32f_neon(float* bVector, const float* aVector,
         // Prefetch next one, speeds things up
         __VOLK_PREFETCH(aVectorPtr+4);
         b_vec = _vatanq_f32(a_vec);
+        //b_vec = _vatanfast2q_f32(a_vec);
         vst1q_f32(bVectorPtr, b_vec);
         // move pointers ahead
         bVectorPtr+=4;
