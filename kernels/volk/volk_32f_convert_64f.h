@@ -240,7 +240,38 @@ static inline void volk_32f_convert_64f_a_generic(double* outputVector, const fl
 }
 #endif /* LV_HAVE_GENERIC */
 
+#ifdef LV_HAVE_NEONV8
+#include <arm_neon.h>
 
+static inline void
+volk_32f_convert_64f_neonv8(double* outputVector, const float* inputVector, unsigned int num_points) {
+    
+    unsigned int number = 0;
+    unsigned int half_points = num_points / 2;
+    
+    double* outputVectorPtr = outputVector;
+    const float *inputVectorPtr = inputVector;
+    
+    float64x2_t output_vec;
+    float32x2_t input_vec;
+    
+    for(number = 0; number < half_points; number++) {
+        // Load
+        input_vec = vld1_f32(inputVectorPtr);
+        // Convert
+        output_vec = vcvt_f64_f32(input_vec);
+        vst1q_f64(outputVectorPtr, output_vec);
+        outputVectorPtr+=2;
+        inputVectorPtr+=2;
+    }
+    
+    // Deal with the rest
+    for(number = half_points * 2; number < num_points; number++) {
+        *outputVectorPtr++ = ((double)(*inputVectorPtr++));
+    }
+}
+
+#endif /* LV_HAVE_NEONV8 */
 
 
 #endif /* INCLUDED_volk_32f_convert_64f_a_H */
