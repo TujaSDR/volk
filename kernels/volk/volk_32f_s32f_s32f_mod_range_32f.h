@@ -426,6 +426,76 @@ static inline void volk_32f_s32f_s32f_mod_range_32f_generic(float* outputVector,
 #endif /* LV_HAVE_GENERIC */
 
 
+#ifdef LV_HAVE_NEON
+#include <arm_neon.h>
+#include <volk/volk_neon_intrinsics.h>
 
+static inline void volk_32f_s32f_s32f_mod_range_32f_neon(float* outputVector, const float* inputVector, const float lower_bound, const float upper_bound, unsigned int num_points)
+{
+    float* outPtr = outputVector;
+    const float *inPtr = inputVector;
+    const float distance = upper_bound - lower_bound;
+    const float distance_inv = 1./distance;
+    
+    unsigned int number = 0;
+    unsigned int quarter_points = num_points / 4;
+    
+    const float32x4_t lower_bound_vec = vdupq_n_f32(lower_bound);
+    const float32x4_t upper_bound_vec = vdupq_n_f32(upper_bound);
+    const float32x4_t distance_vec = vdupq_n_f32(distance);
+    const float32x4_t distance_inv_vec = vdupq_n_f32(distance_inv);
+    
+    const float32x4_t CONST_0 = vdupq_n_f32(0);
+    const float32x4_t CONST_1 = vdupq_n_f32(1.);
+    
+    for(number = 0; number < quarter_points; number++) {
+        const float32x4_t in_vec = vld1q_f32(inPtr);
+        
+        const uint32x4_t lt_lower_bound = vcltq_f32(in_vec, lower_bound_vec);
+        const uint32x4_t gt_upper_bound = vcgtq_f32(in_vec, upper_bound_vec);
+        
+        const float32x4_t excess = vbslq_f32(lt_lower_bound,
+                                             lower_bound_vec-in_vec,
+                                             vbslq_f32(gt_upper_bound,
+                                                       in_vec-upper_bound_vec,
+                                                       CONST_0));
+        
+        const float32x4_t count = _vtruncateq_f32(excess * distance_inv_vec);
+        const float32x4_t addsub_vec = (count+CONST_1) * distance_vec;
+        
+        const float32x4_t out_vec = vbslq_f32(lt_lower_bound,
+                                              in_vec + addsub_vec,
+                                              vbslq_f32(gt_upper_bound,
+                                                        in_vec - addsub_vec,
+                                                        in_vec));
+        
+        // Store
+        vst1q_f32(outPtr, out_vec);
+        
+        inPtr+=4;
+        outPtr+=4;
+    }
+    
+    for(number = quarter_points * 4; number < num_points; number++) {
+        const float val = *inPtr;
+        if(val < lower_bound){
+            float excess = lower_bound - val;
+            signed int count = (int)(excess/distance);
+            *outPtr = val + (count+1)*distance;
+        }
+        else if(val > upper_bound){
+            float excess = val - upper_bound;
+            signed int count = (int)(excess/distance);
+            *outPtr = val - (count+1)*distance;
+        } else {
+            *outPtr = val;
+        }
+        // Advance pointers
+        inPtr++;
+        outPtr++;
+    }
+}
+
+#endif /* LV_HAVE_NEON */
 
 #endif /* INCLUDED_VOLK_32F_S32F_S32F_MOD_RANGE_32F_A_H */

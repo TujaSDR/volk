@@ -100,8 +100,6 @@ static inline void volk_32fc_s32fc_x2_rotator_32fc_neon(lv_32fc_t* outVector, co
     lv_32fc_t phasePtr[4] = {(*phase), (*phase), (*phase), (*phase)};
     float32x4x2_t input_vec;
     float32x4x2_t output_vec;
-    // float32x4x2_t phase_vec;
-    // float32x4x2_t incr_vec;
     
     unsigned int i = 0, j = 0;
     const unsigned int quarter_points = num_points / 4;

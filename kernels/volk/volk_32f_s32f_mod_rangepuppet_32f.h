@@ -42,4 +42,9 @@ static inline void volk_32f_s32f_mod_rangepuppet_32f_a_avx(float *output, const 
   volk_32f_s32f_s32f_mod_range_32f_a_avx(output, input, bound-3.141f, bound, num_points);
 }
 #endif
+#ifdef LV_HAVE_NEON
+static inline void volk_32f_s32f_mod_rangepuppet_32f_neon(float *output, const float *input, float bound, unsigned int num_points){
+    volk_32f_s32f_s32f_mod_range_32f_neon(output, input, bound-3.141f, bound, num_points);
+}
+#endif
 #endif

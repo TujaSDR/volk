@@ -58,7 +58,7 @@ static inline float32x4_t _vinvsqrtq_neonv8_f32(float32x4_t x) {
     float32x4_t sqrt_reciprocal = _vinvq_f32(vsqrtq_f32(x));
     return sqrt_reciprocal;
 }
- */
+*/
 
 static inline float32x4_t _vinvq_f32(float32x4_t x)
 {
@@ -487,6 +487,11 @@ static inline float32x4_t _vtanq_f32(float32x4_t x) {
     float32x4_t ysin, ycos;
     _vsincosq_f32(x, &ysin, &ycos);
     return vmulq_f32(ysin, _vinvq_f32(ycos));
+}
+
+static inline float32x4_t _vtruncateq_f32(float32x4_t x) {
+    // To int and back without rounding
+    return vcvtq_f32_s32(vcvtq_s32_f32(x));
 }
 
 #endif /* INCLUDE_VOLK_VOLK_NEON_INTRINSICS_H_ */

@@ -78,7 +78,6 @@ volk_32u_popcnt_generic(uint32_t* ret, const uint32_t value)
 
 #endif /*LV_HAVE_GENERIC*/
 
-
 #ifdef LV_HAVE_SSE4_2
 
 #include <nmmintrin.h>

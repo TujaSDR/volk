@@ -351,5 +351,52 @@ volk_16ic_s32f_magnitude_32f_u_avx2(float* magnitudeVector, const lv_16sc_t* com
 }
 #endif /* LV_HAVE_AVX2 */
 
-#endif /* INCLUDED_volk_16ic_s32f_magnitude_32f_u_H */
 
+#ifdef LV_HAVE_NEONV8
+#include <arm_neon.h>
+#include <volk/volk_neon_intrinsics.h>
+
+static inline void
+volk_16ic_s32f_magnitude_32f_neonv8(float* magnitudeVector, const lv_16sc_t* complexVector, const float scalar, unsigned int num_points)
+{
+    unsigned int number = 0;
+    unsigned int quarter_points = num_points / 4;
+    
+    const float inv_scalar = 1. / scalar;
+    
+    float* magnitudeVectorPtr = magnitudeVector;
+    const lv_16sc_t* complexVectorPtr = complexVector;
+    
+    float32x4_t mag_vec;
+    float32x4x2_t c_vec;
+    
+    for(number = 0; number < quarter_points; number++) {
+        const int16x4x2_t c16_vec = vld2_s16((int16_t*)complexVectorPtr);
+        // Convert to float32
+        c_vec.val[0] = vcvtq_f32_s32(vmovl_s16(c16_vec.val[0]));
+        c_vec.val[1] = vcvtq_f32_s32(vmovl_s16(c16_vec.val[1]));
+        // Scale
+        c_vec.val[0] = vmulq_n_f32(c_vec.val[0], inv_scalar);
+        c_vec.val[1] = vmulq_n_f32(c_vec.val[1], inv_scalar);
+        // vsqrtq_f32 is armv8
+        mag_vec = vsqrtq_f32(_vmagnitudesquaredq_f32(c_vec));
+        // Store
+        vst1q_f32(magnitudeVectorPtr, mag_vec);
+        // Advance pointers
+        magnitudeVectorPtr+=4;
+        complexVectorPtr+=4;
+    }
+    
+    // Deal with the rest
+    for(number = quarter_points * 4; number < num_points; number++) {
+        const float real = lv_creal(*complexVectorPtr) * inv_scalar;
+        const float imag = lv_cimag(*complexVectorPtr) * inv_scalar;
+        *magnitudeVectorPtr = sqrtf(real*real+imag*imag);
+        complexVectorPtr++;
+        magnitudeVectorPtr++;
+    }
+}
+#endif /* LV_HAVE_NEONV8 */
+
+
+#endif /* INCLUDED_volk_16ic_s32f_magnitude_32f_u_H */
