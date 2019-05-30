@@ -370,6 +370,11 @@ extern void volk_32f_x2_add_32f_a_neonasm(float* cVector, const float* aVector, 
 extern void volk_32f_x2_add_32f_a_neonpipeline(float* cVector, const float* aVector, const float* bVector, unsigned int num_points);
 #endif /* LV_HAVE_NEONV7 */
 
+#ifdef LV_HAVE_NEONV8
+extern void
+volk_32f_x2_add_32f_a_neonv8asm(float* cVector, const float* aVector, const float* bVector, unsigned int num_points);
+#endif /* LV_HAVE_NEONV8 */
+
 #ifdef LV_HAVE_GENERIC
 
 static inline void

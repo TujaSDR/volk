@@ -450,6 +450,7 @@ static inline void volk_32f_s32f_s32f_mod_range_32f_neon(float* outputVector, co
     
     for(number = 0; number < quarter_points; number++) {
         const float32x4_t in_vec = vld1q_f32(inPtr);
+        __VOLK_PREFETCH(inPtr+4);
         
         const uint32x4_t lt_lower_bound = vcltq_f32(in_vec, lower_bound_vec);
         const uint32x4_t gt_upper_bound = vcgtq_f32(in_vec, upper_bound_vec);

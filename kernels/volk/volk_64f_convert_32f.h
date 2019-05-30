@@ -328,6 +328,7 @@ volk_64f_convert_32f_neonv8(float* outputVector, const double* inputVector, unsi
     
     for(number = 0; number < half_points; number++) {
         input_vec = vld1q_f64(inputVectorPtr);
+        __VOLK_PREFETCH(inputVectorPtr+2);
         output_vec = vcvt_f32_f64(input_vec);
         vst1_f32(outputVectorPtr, output_vec);
         outputVectorPtr+=2;

@@ -389,6 +389,7 @@ volk_16ic_magnitude_16i_neonv8(int16_t* magnitudeVector, const lv_16sc_t* comple
     
     for(number = 0; number < quarter_points; number++) {
         const int16x4x2_t c16_vec = vld2_s16((int16_t*)complexVectorPtr);
+        __VOLK_PREFETCH(complexVectorPtr+4);
         c_vec.val[0] = vcvtq_f32_s32(vmovl_s16(c16_vec.val[0]));
         c_vec.val[1] = vcvtq_f32_s32(vmovl_s16(c16_vec.val[1]));
         // Scale to close to 0-1

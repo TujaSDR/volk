@@ -658,6 +658,11 @@ extern void volk_32fc_32f_dot_prod_32fc_a_neonasmvmla ( lv_32fc_t* result, const
 extern void volk_32fc_32f_dot_prod_32fc_a_neonpipeline ( lv_32fc_t* result, const  lv_32fc_t* input, const  float* taps, unsigned int num_points);
 #endif /*LV_HAVE_NEONV7*/
 
+#ifdef LV_HAVE_NEONV8
+extern void
+volk_32fc_32f_dot_prod_32fc_a_neonv8asm(lv_32fc_t* result, const lv_32fc_t* input, const float * taps, unsigned int num_points);
+#endif /* LV_HAVE_NEONV8 */
+
 #ifdef LV_HAVE_SSE
 
 static inline void volk_32fc_32f_dot_prod_32fc_u_sse( lv_32fc_t* result, const  lv_32fc_t* input, const  float* taps, unsigned int num_points) {

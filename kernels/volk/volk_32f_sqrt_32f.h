@@ -147,6 +147,7 @@ volk_32f_sqrt_32f_neonv8(float* cVector, const float* aVector, unsigned int num_
     
     for(number = 0; number < quarter_points; number++) {
         in_vec = vld1q_f32(aPtr);
+        __VOLK_PREFETCH(aPtr+4);
         // vsqrtq_f32 is new in armv8
         out_vec = vsqrtq_f32(in_vec);
         vst1q_f32(cPtr, out_vec);

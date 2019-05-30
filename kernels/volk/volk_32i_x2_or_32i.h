@@ -211,6 +211,8 @@ volk_32i_x2_or_32i_neon(int32_t* cVector, const int32_t* aVector,
   for(number = 0; number < quarter_points; number++){
     a_val = vld1q_s32(aPtr);
     b_val = vld1q_s32(bPtr);
+    __VOLK_PREFETCH(aPtr+4);
+    __VOLK_PREFETCH(bPtr+4);
     c_val = vorrq_s32(a_val, b_val);
     vst1q_s32(cPtr, c_val);
     aPtr += 4;

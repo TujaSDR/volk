@@ -647,5 +647,39 @@ static inline void volk_32f_x2_dot_prod_16i_u_avx512f(int16_t* result, const  fl
 
 #endif /*LV_HAVE_AVX512F*/
 
+#ifdef LV_HAVE_NEON
+#include <arm_neon.h>
+#include <volk/volk_neon_intrinsics.h>
+
+static inline void volk_32f_x2_dot_prod_16i_neon(int16_t* result, const float* input, const float* taps, unsigned int num_points) {
+    
+    float dotProduct = 0;
+    const float* aPtr = input;
+    const float* bPtr = taps;
+    
+    const unsigned int quarter_points = num_points / 4;
+    unsigned int number = 0;
+    
+    float32x4_t dot_prod_vec = vdupq_n_f32(0);
+    
+    for(number = 0; number < quarter_points; number++) {
+        const float32x4_t a_vec = vld1q_f32(aPtr);
+        const float32x4_t b_vec = vld1q_f32(bPtr);
+        __VOLK_PREFETCH(aPtr+4);
+        __VOLK_PREFETCH(bPtr+4);
+        dot_prod_vec = vmlaq_f32(dot_prod_vec, a_vec, b_vec);
+        aPtr+=4;
+        bPtr+=4;
+    }
+    dotProduct = _vsumq_f32(dot_prod_vec);
+    // Deal with the rest
+    for(number = quarter_points * 4; number < num_points; number++) {
+        dotProduct += ((*aPtr++) * (*bPtr++));
+    }
+    
+    *result = (int16_t)dotProduct;
+}
+#endif /*LV_HAVE_NEON*/
+
 
 #endif /*INCLUDED_volk_32f_x2_dot_prod_16i_H*/

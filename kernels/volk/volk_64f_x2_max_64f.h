@@ -315,6 +315,8 @@ volk_64f_x2_max_64f_neonv8(double *cVector, const double *aVector,
     for(number = 0; number < half_points; number++) {
         a_vec = vld1q_f64(aVectorPtr);
         b_vec = vld1q_f64(bVectorPtr);
+        __VOLK_PREFETCH(aVectorPtr+2);
+        __VOLK_PREFETCH(bVectorPtr+2);
         c_vec = vmaxq_f64(a_vec, b_vec);
         vst1q_f64(cVectorPtr, c_vec);
         

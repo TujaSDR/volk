@@ -355,6 +355,8 @@ volk_32fc_magnitude_32f_neon(float* magnitudeVector, const lv_32fc_t* complexVec
   float32x4_t magnitude_vec;
   for(number = 0; number < quarter_points; number++){
     complex_vec = vld2q_f32(complexVectorPtr);
+    __VOLK_PREFETCH(complexVectorPtr+4);
+    
     complex_vec.val[0] = vmulq_f32(complex_vec.val[0], complex_vec.val[0]);
     magnitude_vec = vmlaq_f32(complex_vec.val[0], complex_vec.val[1], complex_vec.val[1]);
     magnitude_vec = vrsqrteq_f32(magnitude_vec);
@@ -412,7 +414,8 @@ volk_32fc_magnitude_32f_neon_fancy_sweet(float* magnitudeVector, const lv_32fc_t
   float32x4_t real_abs, imag_abs;
   for(number = 0; number < quarter_points; number++){
     complex_vec = vld2q_f32(complexVectorPtr);
-
+    __VOLK_PREFETCH(complexVectorPtr+4);
+    
     real_abs = vabsq_f32(complex_vec.val[0]);
     imag_abs = vabsq_f32(complex_vec.val[1]);
 
@@ -466,6 +469,8 @@ volk_32fc_magnitude_32f_neonv8(float* magnitudeVector, const lv_32fc_t* complexV
     float32x4_t mag_vec;
     for(number = 0; number < quarter_points; number++) {
         complex_vec = vld2q_f32((float*)complexVectorPtr);
+        __VOLK_PREFETCH(complexVectorPtr+4);
+        
         mag_squared_vec = _vmagnitudesquaredq_f32(complex_vec);
         // vsqrtq_f32 is new in armv8
         mag_vec = vsqrtq_f32(mag_squared_vec);

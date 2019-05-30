@@ -370,10 +370,11 @@ volk_32f_log2_32f_neon(float* bVector, const float* aVector, unsigned int num_po
   for(number = 0; number < quarterPoints; ++number){
     // load float in to an int register without conversion
     aval = vld1q_s32((int*)aPtr);
+    __VOLK_PREFETCH(aPtr+4);
 
     VLOG2Q_NEON_F32(log2_approx, aval)
 
-      vst1q_f32(bPtr, log2_approx);
+    vst1q_f32(bPtr, log2_approx);
 
     aPtr += 4;
     bPtr += 4;
@@ -392,7 +393,7 @@ volk_32f_log2_32f_neon(float* bVector, const float* aVector, unsigned int num_po
 #include <volk/volk_neon_intrinsics.h>
 
 static inline void
-volk_32f_log2_32f_neon_tuja(float* bVector, const float* aVector, unsigned int num_points)
+volk_32f_log2_32f_neon_new(float* bVector, const float* aVector, unsigned int num_points)
 {
     float* bPtr = bVector;
     const float* aPtr = aVector;
@@ -405,6 +406,7 @@ volk_32f_log2_32f_neon_tuja(float* bVector, const float* aVector, unsigned int n
     for(number = 0; number < quarterPoints; ++number){
         // load float in to an int register without conversion
         aval = vld1q_f32((float*)aPtr);
+        __VOLK_PREFETCH(aPtr+4);
         log2_approx = _vlog2q_f32(aval);
         vst1q_f32(bPtr, log2_approx);
         aPtr += 4;

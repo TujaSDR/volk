@@ -361,6 +361,39 @@ volk_32fc_magnitude_squared_32f_neon(float* magnitudeVector, const lv_32fc_t* co
 }
 #endif /* LV_HAVE_NEON */
 
+#ifdef LV_HAVE_NEON
+#include <arm_neon.h>
+#include <volk/volk_neon_intrinsics.h>
+
+static inline void
+volk_32fc_magnitude_squared_32f_neon_new(float* magnitudeVector, const lv_32fc_t* complexVector,
+                                         unsigned int num_points)
+{
+    unsigned int number = 0;
+    const unsigned int quarter_points = num_points / 4;
+    
+    const lv_32fc_t* complexVectorPtr = complexVector;
+    float* magnitudeVectorPtr = magnitudeVector;
+    
+    for(number = 0; number < quarter_points; number++){
+        const float32x4x2_t cmplx_vec = vld2q_f32((float*)complexVectorPtr);
+        __VOLK_PREFETCH(complexVectorPtr+4);
+        const float32x4_t mag_vec = _vmagnitudesquaredq_f32(cmplx_vec);
+        vst1q_f32(magnitudeVectorPtr, mag_vec);
+        complexVectorPtr += 4;
+        magnitudeVectorPtr += 4;
+    }
+    
+    for(number = quarter_points * 4; number < num_points; number++) {
+        const float real = lv_creal(*complexVectorPtr);
+        const float imag = lv_cimag(*complexVectorPtr);
+        *magnitudeVectorPtr = (real * real) + (imag * imag);
+        complexVectorPtr++;
+        magnitudeVectorPtr++;
+    }
+}
+
+#endif /* LV_HAVE_NEON */
 
 #ifdef LV_HAVE_GENERIC
 

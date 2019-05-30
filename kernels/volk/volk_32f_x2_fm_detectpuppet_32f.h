@@ -76,4 +76,16 @@ static inline void volk_32f_x2_fm_detectpuppet_32f_u_avx(float* outputVector, co
   volk_32f_s32f_32f_fm_detect_32f_u_avx(outputVector, inputVector, bound, saveValue, num_points);
 }
 #endif /* LV_HAVE_AVX */
+
+#ifdef LV_HAVE_NEON
+#include <arm_neon.h>
+
+static inline void volk_32f_x2_fm_detectpuppet_32f_neon(float* outputVector, const float* inputVector, float* saveValue, unsigned int num_points)
+{
+    const float bound = 1.0f;
+    
+    volk_32f_s32f_32f_fm_detect_32f_neon(outputVector, inputVector, bound, saveValue, num_points);
+}
+#endif /* LV_HAVE_NEON */
+
 #endif /* INCLUDED_volk_32f_x2_fm_detectpuppet_32f_u_H */

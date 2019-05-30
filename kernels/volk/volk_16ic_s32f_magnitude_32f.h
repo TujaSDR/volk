@@ -372,6 +372,7 @@ volk_16ic_s32f_magnitude_32f_neonv8(float* magnitudeVector, const lv_16sc_t* com
     
     for(number = 0; number < quarter_points; number++) {
         const int16x4x2_t c16_vec = vld2_s16((int16_t*)complexVectorPtr);
+        __VOLK_PREFETCH(complexVectorPtr+4);
         // Convert to float32
         c_vec.val[0] = vcvtq_f32_s32(vmovl_s16(c16_vec.val[0]));
         c_vec.val[1] = vcvtq_f32_s32(vmovl_s16(c16_vec.val[1]));

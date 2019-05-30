@@ -274,4 +274,37 @@ volk_32f_binary_slicer_32i_u_avx(int* cVector, const float* aVector, unsigned in
 #endif /* LV_HAVE_AVX */
 
 
+#ifdef LV_HAVE_NEON
+#include <arm_neon.h>
+
+static inline void
+volk_32f_binary_slicer_32i_neon(int* cVector, const float* aVector, unsigned int num_points)
+{
+    int* cPtr = cVector;
+    const float* aPtr = aVector;
+    
+    const unsigned int quarter_points = num_points / 4;
+    unsigned int number = 0;
+    
+    const float32x4_t CONST_0 = vdupq_n_f32(0);
+    const uint32x4_t CONST_0x01 = vdupq_n_u32(1);
+    
+    for(number = 0; number < quarter_points; number++) {
+        const float32x4_t a_vec = vld1q_f32(aPtr);
+        __VOLK_PREFETCH(aPtr+4);
+        // a >= 0?
+        const uint32x4_t ge_0 = vcgeq_f32(a_vec, CONST_0);
+        const uint32x4_t out_vec = vandq_u32(ge_0, CONST_0x01);
+        vst1q_u32((uint32_t*) cPtr, out_vec);
+        // Advance pointers
+        cPtr+=4;
+        aPtr+=4;
+    }
+    
+    for(number = quarter_points * 4; number < num_points; number++) {
+        *cPtr++ = *aPtr++ >= 0 ? 1 : 0;
+    }
+}
+#endif /* LV_HAVE_NEON */
+
 #endif /* INCLUDED_volk_32f_binary_slicer_32i_H */

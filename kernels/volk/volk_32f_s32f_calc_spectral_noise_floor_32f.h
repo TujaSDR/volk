@@ -462,4 +462,75 @@ volk_32f_s32f_calc_spectral_noise_floor_32f_u_avx(float* noiseFloorAmplitude,
   *noiseFloorAmplitude = localNoiseFloorAmplitude;
 }
 #endif /* LV_HAVE_AVX */
+
+
+#ifdef LV_HAVE_NEON
+#include <arm_neon.h>
+
+// PROBABLY NOT CORRECT!!
+static inline void
+volk_32f_s32f_calc_spectral_noise_floor_32f_neon(float* noiseFloorAmplitude,
+                                                 const float* realDataPoints,
+                                                 const float spectralExclusionValue,
+                                                 const unsigned int num_points) {
+    const float* realDataPointsPtr = realDataPoints;
+    const unsigned int quarter_points = num_points / 4;
+    unsigned int number = 0;
+    
+    float sumMean = 0.0;
+    
+    // Sum input
+    float32x4_t sum_vec = vdupq_n_f32(0);
+    for(number = 0; number < quarter_points; number++) {
+        const float32x4_t in_vec = vld1q_f32(realDataPointsPtr);
+        __VOLK_PREFETCH(realDataPointsPtr+4);
+        sum_vec = vaddq_f32(sum_vec, in_vec);
+        realDataPointsPtr+=4;
+    }
+    sumMean = _vsumq_f32(sum_vec);
+    for(number = quarter_points * 4; number < num_points; number++) {
+        sumMean += *realDataPointsPtr++;
+    }
+    
+    // calculate the spectral mean
+    // +20 because for the comparison below we only want to throw out bins
+    // that are significantly higher (and would, thus, affect the mean more)
+    const float meanAmplitude = (sumMean / num_points) + spectralExclusionValue;
+    
+    const float32x4_t mean_amp_vec = vdupq_n_f32(meanAmplitude);
+    sum_vec = vdupq_n_f32(0);
+    uint32x4_t num_gt_mean = vdupq_n_u32(0);
+    realDataPointsPtr = realDataPoints;
+    for(number = 0; number < quarter_points; number++) {
+        const float32x4_t in_vec = vld1q_f32(realDataPointsPtr);
+        __VOLK_PREFETCH(realDataPointsPtr+4);
+        const uint32x4_t le_mean_amp = vcleq_f32(in_vec, mean_amp_vec);
+        const float32x4_t to_add = vbslq_f32(le_mean_amp, in_vec, vdupq_n_f32(0));
+        sum_vec = vaddq_f32(sum_vec, to_add);
+        num_gt_mean = vaddq_u32(num_gt_mean, vbslq_u32(le_mean_amp,
+                                                       vdupq_n_u32(0),
+                                                       vdupq_n_u32(1)));
+        realDataPointsPtr+=4;
+    }
+    unsigned int newNumDataPoints = num_points - _vsumq_u32(num_gt_mean);
+    sumMean = _vsumq_f32(sum_vec);
+    for(number = quarter_points * 4; number < num_points; number++) {
+        float val = *realDataPointsPtr++;
+        if (val<= meanAmplitude)
+            sumMean += val;
+        else
+            newNumDataPoints--;
+    }
+    
+    float localNoiseFloorAmplitude = 0.0;
+    if (newNumDataPoints == 0)             // in the odd case that all
+        localNoiseFloorAmplitude = meanAmplitude; // amplitudes are equal!
+    else
+        localNoiseFloorAmplitude = sumMean / ((float)newNumDataPoints);
+    
+    *noiseFloorAmplitude = localNoiseFloorAmplitude;
+}
+#endif /* LV_HAVE_NEON */
+
+
 #endif /* INCLUDED_volk_32f_s32f_calc_spectral_noise_floor_32f_u_H */

@@ -449,7 +449,8 @@ if(${CMAKE_VERSION} VERSION_GREATER "2.8.9")
   # if we find one that matches our current system architecture
   # set up the assembler flags and include the source files
   foreach(ARCH ${ASM_ARCHS_AVAILABLE})
-      string(REGEX MATCH "${ARCH}" ASM_ARCH "${available_archs}")
+    string(REGEX MATCH "${ARCH}" ASM_ARCH "${available_archs}")
+    # NEONV/
     if( ASM_ARCH STREQUAL "neonv7" )
       message(STATUS "---- Adding ASM files") # we always use ATT syntax
       message(STATUS "-- Detected neon architecture; enabling ASM")
@@ -458,6 +459,20 @@ if(${CMAKE_VERSION} VERSION_GREATER "2.8.9")
       # then add the files
       include_directories(${PROJECT_SOURCE_DIR}/kernels/volk/asm/neon)
       file(GLOB asm_files ${PROJECT_SOURCE_DIR}/kernels/volk/asm/neon/*.s)
+      foreach(asm_file ${asm_files})
+        list(APPEND volk_sources ${asm_file})
+        message(STATUS "Adding source file: ${asm_file}")
+      endforeach(asm_file)
+    endif()
+    # NEONV8 aka aarch64
+    if( ASM_ARCH STREQUAL "neonv8" )
+      message(STATUS "---- Adding ASM files") # we always use ATT syntax
+      message(STATUS "-- Detected neonv8 architecture; enabling ASM")
+      # setup architecture specific assembler flags
+      # set(ARCH_ASM_FLAGS "-mfpu=neon -g")
+      # then add the files
+      include_directories(${PROJECT_SOURCE_DIR}/kernels/volk/asm/aarch64)
+      file(GLOB asm_files ${PROJECT_SOURCE_DIR}/kernels/volk/asm/aarch64/*.s)
       foreach(asm_file ${asm_files})
         list(APPEND volk_sources ${asm_file})
         message(STATUS "Adding source file: ${asm_file}")

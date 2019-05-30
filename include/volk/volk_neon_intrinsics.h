@@ -394,6 +394,15 @@ _vsumq_f32(float32x4_t vec)
     return vget_lane_f32(tmp2, 0);
 }
 
+static inline float
+_vsumq_u32(uint32x4_t vec)
+{
+    // Sum lanes in vec and return value
+    const uint32x2_t tmp1 = vadd_u32(vget_high_u32(vec), vget_low_u32(vec));
+    const uint32x2_t tmp2 = vpadd_u32(tmp1, tmp1);
+    return vget_lane_u32(tmp2, 0);
+}
+
 static inline float32x4_t
 _vclampq_f32(float32x4_t vec, float32x4_t min_vec, float32x4_t max_vec)
 {
@@ -426,6 +435,21 @@ _vmultiply_complexq_f32(float32x4x2_t a_val, float32x4x2_t b_val)
     // combine the products
     c_val.val[0] = vsubq_f32(tmp_real.val[0], tmp_real.val[1]);
     c_val.val[1] = vaddq_f32(tmp_imag.val[0], tmp_imag.val[1]);
+    return c_val;
+}
+
+static inline int16x8x2_t
+_vmultiply_complexq_s16(int16x8x2_t a_val, int16x8x2_t b_val)
+{
+    int16x8x2_t tmp_real;
+    int16x8x2_t tmp_imag;
+    int16x8x2_t c_val;
+    tmp_real.val[0] = vmulq_s16(a_val.val[0], b_val.val[0]);
+    tmp_real.val[1] = vmulq_s16(a_val.val[1], b_val.val[1]);
+    tmp_imag.val[0] = vmulq_s16(a_val.val[0], b_val.val[1]);
+    tmp_imag.val[1] = vmulq_s16(a_val.val[1], b_val.val[0]);
+    c_val.val[0] = vsubq_s16(tmp_real.val[0], tmp_real.val[1]);
+    c_val.val[1] = vaddq_s16(tmp_imag.val[0], tmp_imag.val[1]);
     return c_val;
 }
 

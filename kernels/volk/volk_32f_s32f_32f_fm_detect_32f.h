@@ -303,4 +303,68 @@ static inline void volk_32f_s32f_32f_fm_detect_32f_u_avx(float* outputVector, co
 #endif /* LV_HAVE_AVX */
 
 
+#ifdef LV_HAVE_NEON
+#include <arm_neon.h>
+
+static inline void volk_32f_s32f_32f_fm_detect_32f_neon(float* outputVector, const float* inputVector, const float bound, float* saveValue, unsigned int num_points){
+    if (num_points < 1) {
+        return;
+    }
+    unsigned int number = 0;
+    unsigned int quarter_points = (num_points-1) / 4;
+    
+    float* outPtr = outputVector;
+    const float* inPtr = inputVector;
+    
+    const float32x4_t bound_vec = vdupq_n_f32(bound);
+    const float32x4_t neg_bound_vec = vdupq_n_f32(-bound);
+    const float32x4_t bound_adj_vec = vdupq_n_f32(2.*bound);
+    
+    // Do the first 4 by hand since we're going in from the saveValue:
+    *outPtr = *inPtr - *saveValue;
+    if (*outPtr >  bound) *outPtr -= 2*bound;
+    if (*outPtr < -bound) *outPtr += 2*bound;
+    inPtr++;
+    outPtr++;
+    for (unsigned int j = 1; j < ( (4 < num_points) ? 4 : num_points); j++) {
+        *outPtr = *(inPtr) - *(inPtr-1);
+        if (*outPtr >  bound) *outPtr -= 2*bound;
+        if (*outPtr < -bound) *outPtr += 2*bound;
+        inPtr++;
+        outPtr++;
+    }
+    
+    for(number = 1; number < quarter_points; number++) {
+        // Load
+        const float32x4_t next3old1_vec = vld1q_f32(inPtr-1);
+        const float32x4_t next4_vec = vld1q_f32(inPtr);
+        __VOLK_PREFETCH(inPtr+4);
+        // Differentiate
+        float32x4_t out_vec = vsubq_f32(next4_vec, next3old1_vec);
+        // Constrain to bounds
+        const uint32x4_t gt_bound = vcgtq_f32(out_vec, bound_vec);
+        const uint32x4_t lt_neg_bound = vcltq_f32(out_vec, neg_bound_vec);
+        out_vec = vbslq_f32(gt_bound, out_vec - bound_adj_vec, out_vec);
+        out_vec = vbslq_f32(lt_neg_bound, out_vec + bound_adj_vec, out_vec);
+        // Store
+        vst1q_f32(outPtr, out_vec);
+        
+        inPtr+=4;
+        outPtr+=4;
+    }
+    
+    for (number = (4 > (quarter_points*4) ? 4 : (4 * quarter_points)); number < num_points; number++) {
+        *outPtr = *(inPtr) - *(inPtr-1);
+        if (*outPtr >  bound) *outPtr -= 2*bound;
+        if (*outPtr < -bound) *outPtr += 2*bound;
+        inPtr++;
+        outPtr++;
+    }
+    
+    // Continuous
+    *saveValue = inputVector[num_points-1];
+}
+#endif /* LV_HAVE_NEON */
+
+
 #endif /* INCLUDED_volk_32f_s32f_32f_fm_detect_32f_u_H */
