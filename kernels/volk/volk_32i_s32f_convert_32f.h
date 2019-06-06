@@ -106,7 +106,6 @@ volk_32i_s32f_convert_32f_neon(float* outputVector,
         *outputVectorPtr++ = ((float)(*inputVectorPtr++)) * iScalar;
     }
 }
-
 #endif /* LV_HAVE_NEON */
 
 #ifdef LV_HAVE_AVX512F

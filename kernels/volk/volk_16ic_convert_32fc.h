@@ -187,6 +187,38 @@ static inline void volk_16ic_convert_32fc_neon(lv_32fc_t* outputVector, const lv
 }
 #endif /* LV_HAVE_NEON */
 
+#ifdef LV_HAVE_NEON
+#include <arm_neon.h>
+
+static inline void volk_16ic_convert_32fc_neon_new(lv_32fc_t* outputVector, const lv_16sc_t* inputVector, unsigned int num_points)
+{
+    unsigned int number;
+    num_points = 2 * num_points;
+    const unsigned int quarter_points = num_points / 4;
+    
+    const int16_t* inputVectorPtr = (int16_t*) inputVector;
+    float* outputVectorPtr = (float*) outputVector;
+    
+    for(number = 0; number < quarter_points; number++)
+    {
+        const int16x4_t in_vec = vld1_s16(inputVectorPtr);
+        __VOLK_PREFETCH(inputVectorPtr + 4);
+        // Widen to 32bits and convert to float
+        const float32x4_t out_vec = vcvtq_f32_s32(vmovl_s16(in_vec));
+        vst1q_f32(outputVectorPtr, out_vec);
+        // Advance pointers
+        inputVectorPtr+=4;
+        outputVectorPtr+=4;
+    }
+    
+    for(number = quarter_points * 4; number < num_points; number++)
+    {
+        *outputVectorPtr++ = (float)*inputVectorPtr++;
+    }
+}
+#endif /* LV_HAVE_NEON */
+
+
 #endif /* INCLUDED_volk_32fc_convert_16ic_a_H */
 
 #ifndef INCLUDED_volk_16ic_convert_32fc_u_H

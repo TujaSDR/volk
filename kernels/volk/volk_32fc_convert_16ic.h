@@ -221,6 +221,50 @@ static inline void volk_32fc_convert_16ic_neon(lv_16sc_t* outputVector, const lv
 
 #endif /* LV_HAVE_NEON */
 
+#ifdef LV_HAVE_NEONV8
+#include <arm_neon.h>
+#include <volk/volk_neon_intrinsics.h>
+
+static inline void volk_32fc_convert_16ic_neonv8(lv_16sc_t* outputVector, const lv_32fc_t* inputVector, unsigned int num_points)
+{
+    unsigned int number = 0;
+    // We will treat the complex values as "real" and loop over x2 points.
+    num_points = 2 * num_points;
+    const unsigned int quarter_points = num_points / 4;
+    const float* inputVectorPtr = (const float*) inputVector;
+    int16_t* outputVectorPtr = (int16_t*)outputVector;
+    
+    const float min_val_f = (float) INT16_MIN;
+    const float max_val_f = (float) INT16_MAX;
+    
+    const float32x4_t min_vec = vdupq_n_f32(min_val_f);
+    const float32x4_t max_vec = vdupq_n_f32(max_val_f);
+    
+    for(number = 0; number < quarter_points; number++)
+    {
+        const float32x4_t in_vec = vld1q_f32((float*)inputVectorPtr);
+        // Prefetch next
+        __VOLK_PREFETCH(inputVectorPtr + 4);
+        const float32x4_t clamped_in_vec = _vclampq_f32(in_vec, min_vec, max_vec);
+        // Convert and narrow (round to nearest, ties away from zero)
+        const int16x4_t out_vec = vqmovn_s32(vcvtaq_s32_f32(clamped_in_vec));
+        vst1_s16(outputVectorPtr, out_vec);
+        // Advance pointers
+        inputVectorPtr += 4;
+        outputVectorPtr += 4;
+    }
+    // Deal with the rest
+    for(number = quarter_points * 4; number < num_points; number++)
+    {
+        float val = *inputVectorPtr++;
+        if(val > max_val_f)
+            val = max_val_f;
+        else if(val < min_val_f)
+            val = min_val_f;
+        *outputVectorPtr++ = (int16_t)rintf(val);
+    }
+}
+#endif /* LV_HAVE_NEONV8 */
 
 #ifdef LV_HAVE_GENERIC
 

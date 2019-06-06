@@ -910,4 +910,8 @@ extern void volk_32f_x2_dot_prod_32f_a_neonasm(float* cVector, const float* aVec
 extern void volk_32f_x2_dot_prod_32f_a_neonasm_opts(float* cVector, const float* aVector, const float* bVector, unsigned int num_points);
 #endif /* LV_HAVE_NEONV7 */
 
+#ifdef LV_HAVE_NEONV8
+extern void volk_32f_x2_dot_prod_32f_a_neonv8asm(float * result, const float * input, const float * taps, unsigned int num_points);
+#endif /* LV_HAVE_NEONV8 */
+
 #endif /*INCLUDED_volk_32f_x2_dot_prod_32f_a_H*/
