@@ -87,18 +87,16 @@ volk_32f_s32f_power_32f_neon(float* cVector, const float* aVector,
     float* cPtr = cVector;
     const float* aPtr = aVector;
     unsigned int number;
-    unsigned int quarter_points = num_points / 4;
-    float32x4_t c_vec;
-    float32x4_t a_vec;
+    const unsigned int quarter_points = num_points / 4;
     
     const float32x4_t power_vec = vdupq_n_f32(power);
     
     for(number = 0; number < quarter_points; number++) {
         // load f32
-        a_vec = vld1q_f32(aPtr);
+        const float32x4_t a_vec = vld1q_f32(aPtr);
         // Prefetch next 4
         __VOLK_PREFETCH(aPtr+4);
-        c_vec = _vpowq_f32(a_vec, power_vec);
+        const float32x4_t c_vec = _vpowq_f32(a_vec, power_vec);
         vst1q_f32(cPtr, c_vec);
         // move pointers ahead
         cPtr+=4;

@@ -52,14 +52,6 @@
 
 #include <arm_neon.h>
 
-/*
-static inline float32x4_t _vinvsqrtq_neonv8_f32(float32x4_t x) {
-    // vsqrtq_f32 is new in armv8
-    float32x4_t sqrt_reciprocal = _vinvq_f32(vsqrtq_f32(x));
-    return sqrt_reciprocal;
-}
-*/
-
 static inline float32x4_t _vinvq_f32(float32x4_t x)
 {
     // Newton's method
@@ -68,6 +60,38 @@ static inline float32x4_t _vinvq_f32(float32x4_t x)
     recip             = vmulq_f32(vrecpsq_f32(x, recip), recip);
     return recip;
 }
+
+#ifdef LV_HAVE_NEONV8
+/* Neonv8 inverse square root */
+static inline float32x4_t _vinvsqrtq_f32(float32x4_t x) {
+    // vsqrtq_f32 is new in armv8
+    float32x4_t sqrt_reciprocal = _vinvq_f32(vsqrtq_f32(x));
+    return sqrt_reciprocal;
+}
+#elif LV_HAVE_NEON
+/* Neonv7 inverse square root */
+static inline float32x4_t _vinvsqrtq_f32(float32x4_t x)
+{
+    float32x4_t sqrt_reciprocal = vrsqrteq_f32(x);
+    sqrt_reciprocal = vmulq_f32(vrsqrtsq_f32(vmulq_f32(x, sqrt_reciprocal), sqrt_reciprocal), sqrt_reciprocal);
+    sqrt_reciprocal = vmulq_f32(vrsqrtsq_f32(vmulq_f32(x, sqrt_reciprocal), sqrt_reciprocal), sqrt_reciprocal);
+    
+    return sqrt_reciprocal;
+}
+#endif
+
+#ifdef LV_HAVE_NEONV8
+static inline float32x4_t _vsqrtq_f32(float32x4_t x)
+{
+    return vsqrtq_f32(x);
+}
+#elif LV_HAVE_NEON
+/* WARNING: does not handle 0 well, needs work */
+static inline float32x4_t _vsqrtq_f32(float32x4_t x)
+{
+    return _vinvq_f32(_vinvsqrtq_f32(x));
+}
+#endif
 
 static inline float32x4_t
 _vmagnitudesquaredq_f32(float32x4x2_t cmplxValue)
@@ -79,20 +103,10 @@ _vmagnitudesquaredq_f32(float32x4x2_t cmplxValue)
     return result;
 }
 
-static inline float32x4_t _vinvsqrtq_f32(float32x4_t x)
+static inline float32x4_t
+_vmagnitudeq_f32(float32x4x2_t cmplxValue)
 {
-    float32x4_t sqrt_reciprocal = vrsqrteq_f32(x);
-    sqrt_reciprocal = vmulq_f32(vrsqrtsq_f32(vmulq_f32(x, sqrt_reciprocal), sqrt_reciprocal), sqrt_reciprocal);
-    sqrt_reciprocal = vmulq_f32(vrsqrtsq_f32(vmulq_f32(x, sqrt_reciprocal), sqrt_reciprocal), sqrt_reciprocal);
-    
-    return sqrt_reciprocal;
-}
-
-/* armv8 has vsqrtq_f32
- WARNING: does not handle 0 well, needs work */
-static inline float32x4_t _vsqrtq_f32(float32x4_t x)
-{
-    return _vinvq_f32(_vinvsqrtq_f32(x));
+    return _vsqrtq_f32(_vmagnitudeq_f32(cmplxValue));
 }
 
 /* Adapted from ARM Compute Library MIT license */
@@ -141,7 +155,7 @@ static inline float32x4_t _vexpq_f32(float32x4_t x)
     return poly;
 }
 
-// floor a float32x4_t
+// Floor a float32x4_t
 static inline float32x4_t vfloorq_f32(float32x4_t val)
 {
     const float32x4_t CONST_1 = vdupq_n_f32(1.f);
@@ -150,7 +164,7 @@ static inline float32x4_t vfloorq_f32(float32x4_t val)
     return vbslq_f32(vcgtq_f32(r, val), vsubq_f32(r, CONST_1), r);
 }
 
-// https://stackoverflow.com/questions/46974513/code-for-acos-with-avx256
+/* Inspired by https://stackoverflow.com/questions/46974513/code-for-acos-with-avx256 */
 static inline float32x4_t _vacos2q_f32(float32x4_t x) {
     const float32x4_t CONST_0    = vdupq_n_f32(0.f);
     const float32x4_t CONST_1    = vdupq_n_f32(1.f);
@@ -216,7 +230,7 @@ static inline float32x4_t _vatanq_f32(float32x4_t x) {
     // x < 0
     const uint32x4_t sign_mask = vcltq_f32(x, CONST_0);
     x = vabsq_f32(x);
-
+    
     x1  = vnegq_f32(_vinvq_f32(x));
     x2 = vmulq_f32(vsubq_f32(x, CONST_1),
                    _vinvq_f32(vaddq_f32(x, CONST_1)));
@@ -247,6 +261,7 @@ static inline float32x4_t _vatanq_f32(float32x4_t x) {
     return y;
 }
 
+/* atan with the correct quadrant */
 static inline float32x4_t _vatan2q_f32(float32x4_t y, float32x4_t x) {
     // Adjusts atan to the right quadrant
     const float32x4_t CONST_0    = vdupq_n_f32(0.f);
@@ -254,9 +269,6 @@ static inline float32x4_t _vatan2q_f32(float32x4_t y, float32x4_t x) {
     const float32x4_t CONST_PI_2 = vdupq_n_f32(M_PI_2);
     const float32x4_t CONST_NEG_PI_2 = vdupq_n_f32(-M_PI_2);
 
-    //y = vmulq_n_f32(y, 0.5);
-    //x = vmulq_n_f32(x, 0.5);
-    
     const float32x4_t atan_y_x = _vatanq_f32(vmulq_f32(y, _vinvq_f32(x)));
     
     const float32x4_t atan_y_x_p_pi = atan_y_x + CONST_PI;
@@ -277,14 +289,11 @@ static inline float32x4_t _vatan2q_f32(float32x4_t y, float32x4_t x) {
 }
 
 /* evaluation of 4 sines & cosines at once.
- * Optimized from here:
- * http://gruntthepeon.free.fr/ssemath/
- *
- */
+ * Optimized from here (zlib license)
+ * http://gruntthepeon.free.fr/ssemath/ */
 static inline void _vsincosq_f32(float32x4_t x,
                                  float32x4_t *ysin,
-                                 float32x4_t *ycos) { // any x
-    //float32x4_t xmm1, xmm2, xmm3, y;
+                                 float32x4_t *ycos) {
     float32x4_t y;
     
     const float32x4_t c_minus_cephes_DP1 = vdupq_n_f32(-0.78515625);
@@ -322,18 +331,8 @@ static inline void _vsincosq_f32(float32x4_t x,
     /* get the polynom selection mask
      there is one polynom for 0 <= x <= Pi/4
      and another one for Pi/4<x<=Pi/2
-     Both branches will be computed.
-     */
-    uint32x4_t poly_mask = vtstq_u32(emm2, CONST_2);
-    
-    /* The magic pass: "Extended precision modular arithmetic"
-     x = ((x - y * DP1) - y * DP2) - y * DP3; */
-    /*xmm1 = vmulq_f32(y, c_minus_cephes_DP1);
-    xmm2 = vmulq_f32(y, c_minus_cephes_DP2);
-    xmm3 = vmulq_f32(y, c_minus_cephes_DP3);
-    x = vaddq_f32(x, xmm1);
-    x = vaddq_f32(x, xmm2);
-    x = vaddq_f32(x, xmm3);*/
+     Both branches will be computed. */
+    const uint32x4_t poly_mask = vtstq_u32(emm2, CONST_2);
     
     // The magic pass: "Extended precision modular arithmetic"
     x = vmlaq_f32(x, y, c_minus_cephes_DP1);
@@ -362,8 +361,8 @@ static inline void _vsincosq_f32(float32x4_t x,
     y2 = vmlaq_f32(x, x, y2);
     
     /* select the correct result from the two polynoms */
-    float32x4_t ys = vbslq_f32(poly_mask, y1, y2);
-    float32x4_t yc = vbslq_f32(poly_mask, y2, y1);
+    const float32x4_t ys = vbslq_f32(poly_mask, y1, y2);
+    const float32x4_t yc = vbslq_f32(poly_mask, y2, y1);
     *ysin = vbslq_f32(sign_mask_sin, vnegq_f32(ys), ys);
     *ycos = vbslq_f32(sign_mask_cos, yc, vnegq_f32(yc));
 }
@@ -385,6 +384,7 @@ static inline float32x4_t _vtanhq_f32(float32x4_t val)
     return tanh;
 }
 
+/* Sum lanes in vec and return value */
 static inline float
 _vsumq_f32(float32x4_t vec)
 {
@@ -394,15 +394,16 @@ _vsumq_f32(float32x4_t vec)
     return vget_lane_f32(tmp2, 0);
 }
 
+/* Sum lanes in vec and return value */
 static inline float
 _vsumq_u32(uint32x4_t vec)
 {
-    // Sum lanes in vec and return value
     const uint32x2_t tmp1 = vadd_u32(vget_high_u32(vec), vget_low_u32(vec));
     const uint32x2_t tmp2 = vpadd_u32(tmp1, tmp1);
     return vget_lane_u32(tmp2, 0);
 }
 
+/* Clamp vector between max and min */
 static inline float32x4_t
 _vclampq_f32(float32x4_t vec, float32x4_t min_vec, float32x4_t max_vec)
 {
@@ -415,6 +416,7 @@ _vclampq_s32(int32x4_t vec, int32x4_t min_vec, int32x4_t max_vec)
     return vminq_s32(vmaxq_s32(vec, min_vec), max_vec);
 }
 
+/* Complex multiplication for float32x4x2_t */
 static inline float32x4x2_t
 _vmultiply_complexq_f32(float32x4x2_t a_val, float32x4x2_t b_val)
 {
@@ -438,6 +440,7 @@ _vmultiply_complexq_f32(float32x4x2_t a_val, float32x4x2_t b_val)
     return c_val;
 }
 
+/* Complex multiplication for int16x8x2_t */
 static inline int16x8x2_t
 _vmultiply_complexq_s16(int16x8x2_t a_val, int16x8x2_t b_val)
 {

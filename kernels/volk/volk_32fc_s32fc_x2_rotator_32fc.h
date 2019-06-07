@@ -131,14 +131,14 @@ static inline void volk_32fc_s32fc_x2_rotator_32fc_neon(lv_32fc_t* outVector, co
         }
         // normalize phase so magnitude doesn't grow because of
         // floating point rounding error
-        float32x4_t mag_squared = _vmagnitudesquaredq_f32(phase_vec);
-        float32x4_t inv_mag = _vinvsqrtq_f32(mag_squared);
+        const float32x4_t mag_squared = _vmagnitudesquaredq_f32(phase_vec);
+        const float32x4_t inv_mag = _vinvsqrtq_f32(mag_squared);
         // Multiply complex with real
         phase_vec.val[0] = vmulq_f32(phase_vec.val[0], inv_mag);
         phase_vec.val[1] = vmulq_f32(phase_vec.val[1], inv_mag);
     }
 
-    for(i = 0; i < quarter_points % ROTATOR_RELOAD; ++i) {
+    for(i = 0; i < quarter_points % ROTATOR_RELOAD; i++) {
         input_vec = vld2q_f32((float*) inputVectorPtr);
         // Prefetch next one, speeds things up
         __VOLK_PREFETCH(inputVectorPtr+4);
@@ -156,8 +156,8 @@ static inline void volk_32fc_s32fc_x2_rotator_32fc_neon(lv_32fc_t* outVector, co
     if (i) {
         // normalize phase so magnitude doesn't grow because of
         // floating point rounding error
-        float32x4_t mag_squared = _vmagnitudesquaredq_f32(phase_vec);
-        float32x4_t inv_mag = _vinvsqrtq_f32(mag_squared);
+        const float32x4_t mag_squared = _vmagnitudesquaredq_f32(phase_vec);
+        const float32x4_t inv_mag = _vinvsqrtq_f32(mag_squared);
         // Multiply complex with real
         phase_vec.val[0] = vmulq_f32(phase_vec.val[0], inv_mag);
         phase_vec.val[1] = vmulq_f32(phase_vec.val[1], inv_mag);
@@ -166,7 +166,7 @@ static inline void volk_32fc_s32fc_x2_rotator_32fc_neon(lv_32fc_t* outVector, co
     vst2q_f32((float*)phasePtr, phase_vec);
 
     // Deal with the rest
-    for(i = 0; i < num_points % 4; ++i) {
+    for(i = 0; i < num_points % 4; i++) {
         *outputVectorPtr++ = *inputVectorPtr++ * phasePtr[0];
         phasePtr[0] *= (phase_inc);
     }

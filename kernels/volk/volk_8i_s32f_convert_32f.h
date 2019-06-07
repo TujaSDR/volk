@@ -346,6 +346,7 @@ volk_8i_s32f_convert_32f_neon(float* outputVector, const int8_t* inputVector,
 
 #endif /* LV_HAVE_NEON */
 
+
 #ifdef LV_HAVE_GENERIC
 
 static inline void

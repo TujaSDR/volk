@@ -271,4 +271,39 @@ volk_16ic_s32f_deinterleave_real_32f_u_avx2(float* iBuffer, const lv_16sc_t* com
 }
 #endif /* LV_HAVE_AVX2 */
 
+#ifdef LV_HAVE_NEON
+#include <arm_neon.h>
+static inline void
+volk_16ic_s32f_deinterleave_real_32f_neon(float* iBuffer, const lv_16sc_t* complexVector,
+                                          const float scalar, unsigned int num_points)
+{
+    unsigned int number = 0;
+    const unsigned int quarter_points = num_points / 4;
+    const int16_t* complexVectorPtr = (const int16_t*)complexVector;
+    float* iBufferPtr = iBuffer;
+    
+    const float invScalar = 1.0 / scalar;
+    
+    for(number = 0; number < quarter_points; number++) {
+        const int16x4x2_t input_vec = vld2_s16(complexVectorPtr);
+        __VOLK_PREFETCH(complexVectorPtr+8);
+        // Just use the real part, imag is discared.
+        const float32x4_t output_vec = vcvtq_f32_s32(vmovl_s16(input_vec.val[0]));
+        const float32x4_t output_scaled_vec = vmulq_n_f32(output_vec, invScalar);
+        vst1q_f32(iBufferPtr, output_scaled_vec);
+        // 8 becease input is complex
+        complexVectorPtr+=8;
+        iBufferPtr+=4;
+    }
+    
+    // Deal with the rest
+    for(number = quarter_points * 4; number < num_points; number++) {
+        *iBufferPtr = ((float)(*complexVectorPtr)) * invScalar;
+        // 2 because input is complex
+        complexVectorPtr+=2;
+        iBufferPtr++;
+    }
+}
+#endif /* LV_HAVE_NEON */
+
 #endif /* INCLUDED_volk_16ic_s32f_deinterleave_real_32f_u_H */
